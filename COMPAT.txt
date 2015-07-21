@@ -1,0 +1,8 @@
+ROM incompatibility list:
+- Tetris: Crashes in menu after selecting two player mode
+- Pokemon Trading Card Game: Player name is empty in dialog
+- Obelix: Crashes in menu
+
+To-do:
+- Joystick support
+- RTC timer update
