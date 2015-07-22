@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 #include "peripheral/peripheral.h"
 
 #ifndef GB_H
@@ -112,6 +113,7 @@ typedef struct {
 typedef struct {
 	GBSettings settings;
 	GBPeripheralInfo peripheral;
+	int serial_counter;
 	uint32_t* last_framebuf;
 
 	uint8_t *rom;

@@ -141,7 +141,7 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 void sound_tick(GBContext *gb, int cycles) {
 	double clocks_per_sample = (double)CLOCKS_PER_SEC / gb->settings.sample_rate;
 	float sample = 0;
-	int multiplier = gb->double_speed ? 2 : 1;
+	float multiplier = gb->double_speed ? 2 : 1;
 	int ch;
 	float vol_left = (float)(gb->io[IO_SND_VOLUME] & 0x7) / 7;
 	float vol_right = (float)((gb->io[IO_SND_VOLUME] >> 4) & 0x7) / 7;

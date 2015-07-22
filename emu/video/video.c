@@ -44,7 +44,7 @@ void video_mode(GBContext *gb, int mode) {
 void compare_ly(GBContext *gb, int ly) {
 	if (ly == gb->io[IO_LCD_LYC]) {
 		set_mask(gb->io[IO_LCDSTAT], MASK_LCDSTAT_INTLYC, 0xFF);
-		if (gb->io[IO_LCDSTAT] & MASK_LCDSTAT_INTLYC) {
+		if ((gb->io[IO_LCDSTAT] & MASK_LCDSTAT_INTLYC) && (gb->io[IO_LCDC] & MASK_LCDC_ENABLE)) {
 			req_interrupt(gb, INT_LCDSTAT);
 		}
 	} else {
@@ -232,7 +232,7 @@ void draw_bg(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		if (gb->cgb_mode) {
 			if (gb->cgb_mode == 2 && gb->io[IO_BOOTROM])
 				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
-			if ((bgattr[tile_index] & MASK_BGATTR_PRIORITY) || ((layer == 0 && palette_index == 0) || (layer > 0 && palette_index > 0)))
+			if (((bgattr[tile_index] & MASK_BGATTR_PRIORITY) && layer == 2) || ((layer == 0 && palette_index == 0) || (layer == 1 && palette_index > 0)))
 				line[x] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
 		} else {
 			line[x] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
@@ -273,7 +273,7 @@ void draw_window(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		if (gb->cgb_mode) {
 			if (gb->cgb_mode == 2 && gb->io[IO_BOOTROM])
 				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
-			if ((bgattr[tile_index] & MASK_BGATTR_PRIORITY) || ((layer == 0 && palette_index == 0) || (layer > 0 && palette_index > 0)))
+			if (((bgattr[tile_index] & MASK_BGATTR_PRIORITY) && layer == 2) || ((layer == 0 && palette_index == 0) || (layer == 1 && palette_index > 0)))
 				line[sx] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
 		}  else {
 			line[sx] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
@@ -383,6 +383,8 @@ void draw_scanline(GBContext *gb, uint32_t *framebuf, int scanline) {
 			draw_bg(gb, line, scanline, 1);
 			if (win) draw_window(gb, line, scanline, 1);
 			if (obj) draw_sprites(gb, line, scanline, 1);
+			draw_bg(gb, line, scanline, 2);
+			if (win) draw_window(gb, line, scanline, 2);
 		} else {
 			draw_bg(gb, line, scanline, 0);
 			draw_bg(gb, line, scanline, 1);

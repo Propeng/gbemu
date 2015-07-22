@@ -18,6 +18,6 @@ typedef struct {
 } GBPeripheralInfo;
 
 void init_peripheral(GBPeripheralInfo *info, GBPeripheralDevice type, peripheral_callback callback, void *user_data);
-uint8_t peripheral_transfer(GBPeripheralInfo *info, uint8_t data);
+int peripheral_transfer(GBPeripheralInfo *info, uint8_t data);
 
 #endif

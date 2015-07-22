@@ -30,7 +30,6 @@ int run_instruction(GBContext *gb) {
 		break;
 
 	case 0x76: //halt
-		//next_byte(gb);
 		gb->halted = 1;
 		gb->cycles += 4;
 		break;

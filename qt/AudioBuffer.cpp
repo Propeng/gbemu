@@ -22,7 +22,7 @@ qint64 AudioBuffer::readData(char *data, qint64 maxSize) {
 	}
 	int len = maxSize > buf_size-buf_ptr ? buf_size-buf_ptr : maxSize;
 	char *buf = buf_queue->head();
-	memcpy(data, buf, len);
+	memcpy(data, buf+buf_ptr, len);
 
 	buf_ptr += len;
 	if (buf_ptr >= buf_size) {
@@ -55,7 +55,7 @@ bool AudioBuffer::atEnd() const {
 }
 
 qint64 AudioBuffer::bytesAvailable() const {
-	return buf_queue->length() * buf_size;
+	return buf_queue->length() * buf_size - buf_ptr;
 }
 
 qint64 AudioBuffer::bytesToWrite() const {

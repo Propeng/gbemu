@@ -21,22 +21,26 @@ extern "C" {
 	#include "sdl/audio.h"
 }
 
-EmulatorWidget::EmulatorWidget() : QWidget() {
+QMutex EmulatorWidget::audio_mutex;
+
+EmulatorWidget::EmulatorWidget() : QOpenGLWidget() {
 	//audio_file = fopen("samples", "wb");
 	audio_buf = NULL;
 	printerBuf = NULL;
 	callbuf_data = NULL;
 	loaded = false;
+	overlay_msg[0] = '\0';
+	overlay_time = 0;
+	window_inactive = 0;
 
 	gb = init_context();
 	gb->settings.sample_rate = 48000;
 	gb->settings.emulate_lcd = 1;
 	gb->settings.boot_rom = load_boot_roms();
-	//gb->settings.hw_type = GB_FORCE_CGB;
+	gb->settings.hw_type = GB_FORCE_CGB;
 	gb->settings.save_ram = save_ram_callback;
 	gb->settings.play_sound = write_audio;
 	gb->settings.callback_data = this;
-	//load_rom_file("F:\\Taken from New Linux\\Games\\Emulators\\VisualBoyAdvance\\gbroms\\Pokemon - Crystal Version (USA, Europe).gbc");
 	init_audio();
 
 	last_time = 0;
@@ -50,6 +54,7 @@ EmulatorWidget::EmulatorWidget() : QWidget() {
 	
 	setFocusPolicy(Qt::StrongFocus);
 	resize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
+	setMinimumSize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
 	updateGeometry();
 
 	//setUpdatesEnabled(false);
@@ -227,15 +232,16 @@ QSize EmulatorWidget::sizeHint() const {
 
 void EmulatorWidget::init_audio() {
 	audio_buf = new AudioBuffer(SND_BUFLEN*sizeof(float));
-	audio_buf->open(QIODevice::ReadWrite);
+	audio_buf->open(QIODevice::ReadWrite | QIODevice::Unbuffered);
 	init_sdl_audio(gb->settings.sample_rate, N_CHANNELS, SND_BUFLEN/N_CHANNELS, &sdl_callback, this);
 }
 
 void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
 	EmulatorWidget *widget = (EmulatorWidget*)data;
 	memset(stream, 0, len);
+	QMutexLocker lock(&EmulatorWidget::audio_mutex);
 	if (widget->audio_buf != NULL && widget->audio_buf->isOpen()) {
-		if (widget->audio_buf->bytesAvailable() == 0) return;
+		if (widget->audio_buf->bytesAvailable() < len) return;
 		int read_bytes = 0;
 		while (read_bytes < len) {
 			read_bytes += widget->audio_buf->read((char*)stream + read_bytes, len - read_bytes);
@@ -245,6 +251,7 @@ void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
 
 void EmulatorWidget::write_audio(float *samples, int n_bytes, void *data) {
 	EmulatorWidget *widget = (EmulatorWidget*)data;
+	QMutexLocker lock(&EmulatorWidget::audio_mutex);
 	//fwrite(samples, 1, n_bytes, widget->audio_file);
 	//fflush(widget->audio_file);
 	if (widget->audio_buf != NULL && widget->audio_buf->isOpen()) {
@@ -252,7 +259,7 @@ void EmulatorWidget::write_audio(float *samples, int n_bytes, void *data) {
 	}
 }
 
-void EmulatorWidget::paintEvent(QPaintEvent *paintEvent) {
+/*void EmulatorWidget::paintEvent(QPaintEvent *paintEvent) {
 	//setUpdatesEnabled(false);
 	bool flag = run_flag;
 	run_flag = false;
@@ -276,12 +283,70 @@ void EmulatorWidget::paintEvent(QPaintEvent *paintEvent) {
 		QFontMetrics fm(font);
 		painter.drawText(5, height()-fm.height()-5, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
 	}
+}*/
 
-	/*if (gb->frame_counter % FRAMES_PER_SEC == 0) {
-		int now = elapsed->elapsed();
-		printf("%u frames in %u ms, %f fps\n", gb->frame_counter, now-last_sec, (float)FRAMES_PER_SEC/((float)(now-last_sec)/1000));
-		last_sec = now;
-	}*/
+void EmulatorWidget::initializeGL() {
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	void *buf = malloc(DISPLAY_WIDTH*DISPLAY_HEIGHT*4);
+	memset(buf, 0, DISPLAY_WIDTH*DISPLAY_HEIGHT*4);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, GL_BGRA, GL_UNSIGNED_BYTE, buf);
+	free(buf);
+}
+
+void EmulatorWidget::resizeGL(int w, int h) {
+	glViewport(0, 0, w, h);
+	glLoadIdentity();
+}
+
+void EmulatorWidget::paintGL() {
+	glClear(GL_COLOR_BUFFER_BIT);
+	
+	bool flag = run_flag;
+	run_flag = false;
+
+	if (loaded && flag && !gb->settings.paused) {
+		uint32_t *framebuf = run_frame(gb);
+		if (framebuf != NULL) {
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, GL_BGRA, GL_UNSIGNED_BYTE, framebuf);
+		}
+	}
+	
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+	glBegin(GL_QUADS);
+	glTexCoord2f(0, 0);
+	glVertex2f(0, 0);
+	glTexCoord2f(0, 1);
+	glVertex2f(0, DISPLAY_HEIGHT);
+	glTexCoord2f(1, 1);
+	glVertex2f(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+	glTexCoord2f(1, 0);
+	glVertex2f(DISPLAY_WIDTH, 0);
+	glEnd();
+
+	if (last_time < overlay_time) {
+		QPainter painter(this);
+		QFont font("Helvetica", 10, QFont::Bold);
+		painter.setFont(font);
+		float fade = overlay_time-last_time < 500 ? (overlay_time-last_time)/500 : 1;
+		painter.setPen(QPen(QColor(255, 0, 0, fade*255)));
+		QFontMetrics fm(font);
+		painter.drawText(5, height()-fm.height()-5, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
+	}
 }
 
 int EmulatorWidget::gb_button(int key) {
@@ -336,15 +401,17 @@ void EmulatorWidget::timer_tick() {
 			callbuf_data = NULL;
 		}
 
-		//setUpdatesEnabled(true);
-		run_flag = true;
-		update();
+		if (!window_inactive) {
+			//setUpdatesEnabled(true);
+			run_flag = true;
+			update();
+		}
 	}
 }
 
 void EmulatorWidget::closeEvent(QCloseEvent *closeEvent) {
 	if (loaded) {
-		if (printerBuf != NULL) show_printer_buf(false);
+		if (printerBuf != NULL) show_printer_buf(true);
 		if (gb->has_battery) save_ram();
 	}
 	gb->settings.play_sound = NULL;
@@ -392,14 +459,14 @@ void EmulatorWidget::printer_preview(void *data, int width, int height) {
 	activateWindow();
 }
 
-void EmulatorWidget::show_printer_buf(bool allowContinue) {
+void EmulatorWidget::show_printer_buf(bool disableContinue) {
 	int oldpause = gb->settings.paused;
 	gb->settings.paused = 1;
 	if (printerBuf == NULL) {
 		QMessageBox msg(QMessageBox::Information, parentWidget()->windowTitle(), "Printer buffer is empty.", QMessageBox::Ok);
 		msg.exec();
 	} else {
-		PrinterPreview preview(&printerBuf, allowContinue);
+		PrinterPreview preview(&printerBuf, disableContinue);
 		preview.exec();
 	}
 	gb->settings.paused = oldpause;
@@ -414,7 +481,7 @@ void EmulatorWidget::printer_callback(GBPeripheralDevice device, void *data, int
 }
 
 void EmulatorWidget::periph_disconnect() {
-	if (printerBuf != NULL) show_printer_buf();
+	if (printerBuf != NULL) show_printer_buf(true);
 	init_peripheral(&gb->peripheral, DEVICE_NONE, NULL, NULL);
 }
 

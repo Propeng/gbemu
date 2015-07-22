@@ -6,7 +6,7 @@
 #include <QtGui/qpixmap.h>
 #include "PrinterPreview.h"
 
-PrinterPreview::PrinterPreview(QImage **image, bool allowContinue) : QDialog() {
+PrinterPreview::PrinterPreview(QImage **image, bool disableContinue) : QDialog() {
 	QVBoxLayout *vbox = new QVBoxLayout();
 	
 	QLabel *label = new QLabel();
@@ -18,7 +18,7 @@ PrinterPreview::PrinterPreview(QImage **image, bool allowContinue) : QDialog() {
 
 	QPushButton *continueBtn = new QPushButton("Continue printing");
 	connect(continueBtn, &QPushButton::pressed, this, &PrinterPreview::close);
-	continueBtn->setEnabled(allowContinue);
+	continueBtn->setEnabled(!disableContinue);
 	vbox->addWidget(continueBtn);
 
 	QPushButton *saveBtn = new QPushButton("Save and reset printer buffer");

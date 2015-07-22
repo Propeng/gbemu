@@ -25,7 +25,7 @@ GBWindow::GBWindow(QWidget *parent) : QMainWindow(parent) {
 	position.moveCenter(QDesktopWidget().availableGeometry().center());
 	move(position.topLeft());
 	
-	openDialog = new QFileDialog(this, "Open ROM", "F:\\Taken from New Linux\\Games\\Emulators\\VisualBoyAdvance\\gbroms", "Gameboy ROMs (*.gb *.gbc);;All files (*.*)");
+	openDialog = new QFileDialog(this, "Open ROM", "", "Gameboy ROMs (*.gb *.gbc);;All files (*.*)");
 	openDialog->setAcceptMode(QFileDialog::AcceptOpen);
 	openDialog->setFileMode(QFileDialog::ExistingFile);
 	
@@ -69,6 +69,7 @@ void GBWindow::setup_menus() {
 	connect(pauseAction, &QAction::triggered, this, &GBWindow::toggle_pause);
 	pauseAction->setEnabled(false);
 	pauseAction->setCheckable(true);
+	pauseAction->setChecked(false);
 	pauseAction->setShortcut(QKeySequence(Qt::Key_F1));
 	emu->addAction(pauseAction);
 	
@@ -79,7 +80,7 @@ void GBWindow::setup_menus() {
 	emu->addAction(resetAction);
 	emu->addSeparator();
 
-	QMenu *periph = emu->addMenu("Devices");
+	QMenu *periph = emu->addMenu("Serial Devices");
 	
 	periphNone = periph->addAction("None");
 	connect(periphNone, &QAction::triggered, this, &GBWindow::periph_disconnect);
@@ -124,7 +125,6 @@ void GBWindow::toggle_pause() {
 void GBWindow::reset() {
 	widget->reset();
 	pauseAction->setChecked(false);
-	pauseAction->setText("Pause");
 }
 
 void GBWindow::screenshot() {
@@ -145,11 +145,13 @@ void GBWindow::screenshot() {
 
 void GBWindow::focus_changed(Qt::ApplicationState state) {
 	if (state == Qt::ApplicationActive) {
-		if (!paused_focus) toggle_pause();
-		paused_focus = false;
+		//if (!paused_focus) toggle_pause();
+		//paused_focus = false;
+		widget->window_inactive = 0;
 	} else {
-		paused_focus = widget->gb->settings.paused;
-		if (!paused_focus) toggle_pause();
+		//paused_focus = widget->gb->settings.paused;
+		//if (!paused_focus) toggle_pause();
+		widget->window_inactive = 1;
 	}
 }
 

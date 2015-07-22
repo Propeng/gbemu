@@ -210,11 +210,11 @@ uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t va
 		//peripheral_write(&gb->peripheral, val);
 		return val;
 	case IO_SERIAL_CTL:
-		if (val & MASK_SERIAL_START) {
+		/*if (val & MASK_SERIAL_START) {
 			gb->io[IO_SERIAL_DATA] = peripheral_transfer(&gb->peripheral, gb->io[IO_SERIAL_DATA]);
 			req_interrupt(gb, INT_SERIAL);
 			return val & ~MASK_SERIAL_START;
-		}
+		}*/
 		return val;
 	default:
 		return val;

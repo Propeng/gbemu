@@ -8,10 +8,9 @@
 #include "sound/sound.h"
 
 void update_cpu_speed(GBContext *gb) {
-	uint8_t *sw = gb->io+IO_CPUSPEED;
 	if (!gb->cgb_mode) return;
-	if ((*sw) & 1) {
-		*sw ^= 1 | (1 << 7);
+	if (gb->io[IO_CPUSPEED] & 1) {
+		gb->io[IO_CPUSPEED] ^= 1 | (1 << 7);
 		gb->double_speed = !gb->double_speed;
 	}
 }
@@ -74,7 +73,7 @@ int print = 0;
 
 void cpu_cycle(GBContext *gb) {
 	if (!gb->halted) {
-		if (*reg_pc(gb) == 0x0c3e)
+		if (*reg_pc(gb) == 0x13d4)
 			print = 1;
 		//printf("%04X\n", *reg_pc(gb));
 		do_interrupts(gb);
@@ -161,6 +160,18 @@ void inc_timers(GBContext *gb, int cycles) {
 	*/
 }
 
+void serial_transfer(GBContext *gb) {
+	int transfer;
+	if ((gb->io[IO_SERIAL_CTL] & MASK_SERIAL_START) && gb->peripheral.type != DEVICE_NONE) {
+		transfer = peripheral_transfer(&gb->peripheral, gb->io[IO_SERIAL_DATA]);
+		if (gb->io[IO_SERIAL_DATA] >= 0) {
+			gb->io[IO_SERIAL_DATA] = (uint8_t)transfer;
+			req_interrupt(gb, INT_SERIAL);
+			gb->io[IO_SERIAL_CTL] &= ~MASK_SERIAL_START;
+		}
+	}
+}
+
 void run_cycles(GBContext *gb, int cycles) {
 	int clk_start = gb->cycles;
 	int run_until = gb->cycles+cycles-gb->extra_cycles;
@@ -192,6 +203,13 @@ void run_cycles(GBContext *gb, int cycles) {
 			inc_timers(gb, gb->cycles-last_cycles);
 			sound_tick(gb, gb->cycles-last_cycles);
 		}
+		
+		gb->serial_counter += gb->cycles-last_cycles;
+		while (gb->serial_counter >= 100) { //todo: proper serial timing
+			gb->serial_counter -= 100;
+			serial_transfer(gb);
+		}
+		
 		last_cycles = gb->cycles;
 	}
 	if (gb->cycles > run_until) {

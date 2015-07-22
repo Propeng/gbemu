@@ -50,7 +50,7 @@ int get_keys_mask(GBContext *gb) {
 
 uint32_t* run_frame(GBContext *gb) {
 	int period;
-	int multiplier = gb->double_speed ? 2 : 1;
+	float multiplier = gb->double_speed ? 2 : 1;
 	int last_cycles;
 	int clk = gb->cycles;
 	uint32_t *framebuf;
@@ -58,6 +58,14 @@ uint32_t* run_frame(GBContext *gb) {
 	if (gb->settings.paused) {
 		framebuf = gb->last_framebuf;
 	} else {
+		video_mode(gb, 1);
+		if (gb->io[IO_LCDC] & MASK_LCDC_ENABLE)
+			req_interrupt(gb, INT_VBLANK);
+		for (period = 0; period < 10; period++) {
+			update_ly(gb, DISPLAY_HEIGHT+period);
+			run_cycles(gb, (CLK_MODE1/10)*multiplier);
+		}
+
 		if (gb->last_framebuf == NULL) {
 			gb->last_framebuf = (uint32_t*)malloc(DISPLAY_WIDTH*DISPLAY_HEIGHT*sizeof(uint32_t));
 		}
@@ -78,14 +86,6 @@ uint32_t* run_frame(GBContext *gb) {
 		last_cycles = gb->cycles;
 		cpu_cycle(gb);
 		gb->extra_cycles += gb->cycles-last_cycles;
-
-		video_mode(gb, 1);
-		if (gb->io[IO_LCDC] & MASK_LCDC_ENABLE)
-			req_interrupt(gb, INT_VBLANK);
-		for (period = 0; period < 10; period++) {
-			update_ly(gb, DISPLAY_HEIGHT+period);
-			run_cycles(gb, (CLK_MODE1/10)*multiplier);
-		}
 	}
 
 	gb->frame_counter++;

@@ -6,7 +6,7 @@
 class PrinterPreview : public QDialog
 {
 public:
-	PrinterPreview(QImage **image, bool allowContinue = true);
+	PrinterPreview(QImage **image, bool disableContinue = false);
 
 private:
 	QImage **image;

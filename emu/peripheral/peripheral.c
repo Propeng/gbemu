@@ -19,10 +19,10 @@ void init_peripheral(GBPeripheralInfo *info, GBPeripheralDevice type, peripheral
 	}
 }
 
-uint8_t peripheral_transfer(GBPeripheralInfo *info, uint8_t data) {
+int peripheral_transfer(GBPeripheralInfo *info, uint8_t data) {
 	switch (info->type) {
 	case DEVICE_PRINTER:
 		return printer_transfer(info, data);
 	}
-	return 0;
+	return -1;
 }

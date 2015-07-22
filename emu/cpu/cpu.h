@@ -27,6 +27,7 @@ int get_interrupt_jump(GBContext *gb, int flag);
 void do_interrupts(GBContext *gb);
 void cpu_cycle(GBContext *gb);
 void inc_timers(GBContext *gb, int cycles);
+void serial_transfer(GBContext *gb);
 void run_cycles(GBContext *gb, int cycles);
 
 #endif
