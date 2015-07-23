@@ -55,7 +55,7 @@
 
 
 #define N_CHANNELS 2
-#define SND_BUFLEN 2048*N_CHANNELS
+#define SND_BUFLEN 1024*N_CHANNELS
 
 static const uint16_t register_defaults_dmg[] = { 0x01B0, 0x0013, 0x00D8, 0x014D, 0xFFFE, 0x0100 };
 static const uint16_t register_defaults_cgb[] = { 0x1180, 0x0000, 0xFF56, 0x000D, 0xFFFE, 0x0100 };

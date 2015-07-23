@@ -55,17 +55,11 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 
 	memcpy(gb->io+0x10, io_defaults1, sizeof(io_defaults1));
 	memcpy(gb->io+0x40, io_defaults2, sizeof(io_defaults2));
-	
-	//todo don't overwrite settings
-	gb->settings.dmg_palette[0] = 0x00F0F0F0;
-	gb->settings.dmg_palette[1] = 0x00C0C0C0;
-	gb->settings.dmg_palette[2] = 0x00808080;
-	gb->settings.dmg_palette[3] = 0x00404040;
 
 	if (gb->settings.hw_type == GB_FORCE_DMG) {
 		gb->cgb_mode = 0;
 	} else if (gb->settings.hw_type == GB_FORCE_CGB) {
-		gb->cgb_mode = gb->rom[0x0143] == 0x80 || gb->rom[0x0143] == 0xC0 ? 1 : 2;
+		gb->cgb_mode = 1;
 	} else {
 		gb->cgb_mode = gb->rom[0x0143] == 0x80 || gb->rom[0x0143] == 0xC0;
 	}
@@ -100,8 +94,6 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 	}
 
 	printf("Game is running in %s mode.\n", gb->cgb_mode ? "CGB" : "DMG");
-	if (gb->settings.save_interval == 0) gb->settings.save_interval = 3;
-	if (gb->settings.sample_rate == 0) gb->settings.sample_rate = 44100;
 	memset(gb->channels, 0, sizeof(gb->channels));
 	return 1;
 }

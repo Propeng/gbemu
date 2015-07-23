@@ -73,7 +73,7 @@ uint8_t filter_io_read(GBContext *gb, uint16_t addr, uint8_t val) {
 		if (!gb->cgb_mode) return val;
 		return gb->cgb_obj_palette[gb->io[IO_OBPI] & MASK_PI_INDEX];
 	case IO_SND_ENABLE:
-		return gb->channels[0].playing | (gb->channels[1].playing << 1) | (gb->channels[2].playing << 2) | (gb->channels[3].playing << 3) | (val & (1<<7));
+		return gb->channels[0].playing | (gb->channels[1].playing << 1) | (gb->channels[2].playing << 2) | (gb->channels[3].playing << 3) | (val & (1<<7)) | 0x70;
 	//case IO_SERIAL_DATA:
  	//	return peripheral_read(&gb->peripheral);
 	default:
@@ -90,6 +90,9 @@ uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t va
 	ioaddr = (uint8_t)addr;
 
 	switch (ioaddr) {
+	case IO_BOOTROM: // switch into cgb's dmg simulation mode
+		if (val && !(gb->rom[0x0143] == 0x80 || gb->rom[0x0143])) gb->cgb_mode = 2;
+		return val;
 	case IO_JOYP:
 		return val & 0xF0;
 	case IO_DIV:

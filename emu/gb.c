@@ -11,8 +11,14 @@
 GBContext* init_context() {
 	GBContext *gb = (GBContext*)malloc(sizeof(GBContext));
 	memset(gb, 0, sizeof(GBContext));
-	gb->key_states = 0xFF;
 	srand(0);
+	gb->key_states = 0xFF;
+	gb->settings.dmg_palette[0] = 0x00F0F0F0;
+	gb->settings.dmg_palette[1] = 0x00C0C0C0;
+	gb->settings.dmg_palette[2] = 0x00808080;
+	gb->settings.dmg_palette[3] = 0x00404040;
+	gb->settings.save_interval = 3;
+	gb->settings.sample_rate = 44100;
 	return gb;
 }
 

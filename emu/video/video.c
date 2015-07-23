@@ -229,13 +229,17 @@ void draw_bg(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		tile_row = tile+tiley*2;
 
 		palette_index = ((tile_row[0] & (0x80>>tilex)) != 0) | (((tile_row[1] & (0x80>>tilex)) != 0) << 1);
-		if (gb->cgb_mode) {
-			if (gb->cgb_mode == 2 && gb->io[IO_BOOTROM])
-				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
+		if (gb->cgb_mode == 1) {
 			if (((bgattr[tile_index] & MASK_BGATTR_PRIORITY) && layer == 2) || ((layer == 0 && palette_index == 0) || (layer == 1 && palette_index > 0)))
 				line[x] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
+		} else if (gb->cgb_mode == 2) {
+			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0)) {
+				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
+				line[x] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
+			}
 		} else {
-			line[x] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
+			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0))
+				line[x] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
 		}
 	}
 }
@@ -270,13 +274,17 @@ void draw_window(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		tile_row = tile+tiley*2;
 
 		palette_index = ((tile_row[0] & (0x80>>tilex)) != 0) | (((tile_row[1] & (0x80>>tilex)) != 0) << 1);
-		if (gb->cgb_mode) {
-			if (gb->cgb_mode == 2 && gb->io[IO_BOOTROM])
-				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
+		if (gb->cgb_mode == 1) {
 			if (((bgattr[tile_index] & MASK_BGATTR_PRIORITY) && layer == 2) || ((layer == 0 && palette_index == 0) || (layer == 1 && palette_index > 0)))
 				line[sx] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
-		}  else {
-			line[sx] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
+		} else if (gb->cgb_mode == 2) {
+			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0)) {
+				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
+				line[sx] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
+			}
+		} else {
+			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0))
+				line[sx] = dmg_palette_color(gb, gb->io[IO_LCD_BGP], palette_index);
 		}
 	}
 }
@@ -333,24 +341,22 @@ void draw_sprites(GBContext *gb, uint32_t *line, int scanline, int layer) {
 							if (data[3] & MASK_SPATTR_PRIORITY) {
 								if (layer == 0)
 									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + ((data[3] & MASK_SPATTR_CGBPAL)*8), palette_index);
-							} else {
-								if (layer > 0)
-									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + ((data[3] & MASK_SPATTR_CGBPAL)*8), palette_index);
+							} else if (layer > 0) {
+								line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + ((data[3] & MASK_SPATTR_CGBPAL)*8), palette_index);
 							}
 						} else if (gb->cgb_mode == 2) {
 							palette_index = dmg_palette_index(gb, palette, palette_index);
 							if (data[3] & MASK_SPATTR_PRIORITY) {
 								if (layer == 0)
 									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + (((data[3] & MASK_SPATTR_PAL) ? 1 : 0)*8), palette_index);
-							} else {
-								if (layer > 0)
-									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + (((data[3] & MASK_SPATTR_PAL) ? 1 : 0)*8), palette_index);
+							} else if (layer > 0) {
+								line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + (((data[3] & MASK_SPATTR_PAL) ? 1 : 0)*8), palette_index);
 							}
 						} else {
 							if (data[3] & MASK_SPATTR_PRIORITY) {
-								if (line[x] == dmg_palette_color(gb, gb->io[IO_LCD_BGP], 0))
+								if (layer == 0)
 									line[x] = dmg_palette_color(gb, palette, palette_index);
-							} else {
+							} else if (layer > 0) {
 								line[x] = dmg_palette_color(gb, palette, palette_index);
 							}
 						}
@@ -408,5 +414,8 @@ void draw_scanline(GBContext *gb, uint32_t *framebuf, int scanline) {
 		if (bg) draw_bg(gb, line, scanline, 0);
 		if (win) draw_window(gb, line, scanline, 0);
 		if (obj) draw_sprites(gb, line, scanline, 0);
+		if (bg) draw_bg(gb, line, scanline, 1);
+		if (win) draw_window(gb, line, scanline, 1);
+		if (obj) draw_sprites(gb, line, scanline, 1);
 	}
 }
