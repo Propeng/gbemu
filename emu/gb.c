@@ -13,10 +13,6 @@ GBContext* init_context() {
 	memset(gb, 0, sizeof(GBContext));
 	srand(0);
 	gb->key_states = 0xFF;
-	gb->settings.dmg_palette[0] = 0x00F0F0F0;
-	gb->settings.dmg_palette[1] = 0x00C0C0C0;
-	gb->settings.dmg_palette[2] = 0x00808080;
-	gb->settings.dmg_palette[3] = 0x00404040;
 	gb->settings.save_interval = 3;
 	gb->settings.sample_rate = 44100;
 	return gb;
@@ -56,7 +52,7 @@ int get_keys_mask(GBContext *gb) {
 
 uint32_t* run_frame(GBContext *gb) {
 	int period;
-	float multiplier = gb->double_speed ? 2 : 1;
+	int multiplier = gb->double_speed ? 2 : 1;
 	int last_cycles;
 	int clk = gb->cycles;
 	uint32_t *framebuf;
@@ -92,6 +88,11 @@ uint32_t* run_frame(GBContext *gb) {
 		last_cycles = gb->cycles;
 		cpu_cycle(gb);
 		gb->extra_cycles += gb->cycles-last_cycles;
+
+		if (gb->sgb.vblank_read) {
+			gb->sgb.vblank_read = 0;
+			gb->sgb.vblank_callback(gb);
+		}
 	}
 
 	gb->frame_counter++;
@@ -102,4 +103,13 @@ uint32_t* run_frame(GBContext *gb) {
 		gb->settings.save_ram(gb->settings.callback_data);
 
 	return framebuf;
+}
+
+void skip_bootrom(GBContext *gb) {
+	void *snd_callback = gb->settings.play_sound;
+	gb->settings.play_sound = NULL;
+	while (gb->io[IO_BOOTROM] == 0) {
+		run_frame(gb);
+	}
+	gb->settings.play_sound = snd_callback;
 }

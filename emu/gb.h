@@ -1,6 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "peripheral/peripheral.h"
+#define DEF_STRUCTS
+#include "sgb.h"
+#undef DEF_STRUCTS
 
 #ifndef GB_H
 #define GB_H
@@ -65,11 +68,13 @@ static const uint16_t rst_jump[] = { 0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0
 static const uint16_t int_jump[] = { 0x40, 0x48, 0x50, 0x58, 0x60 };
 
 typedef enum {
-	GB_AUTO, GB_FORCE_DMG, GB_FORCE_CGB,
+	GB_CGB, GB_SGB, GB_DMG,
 } GBType;
 
 typedef struct {
-	GBType hw_type;
+	GBType cgb_hw;
+	GBType sgb_hw;
+	GBType dmg_hw;
 	int boot_rom;
 	int paused;
 	uint32_t dmg_palette[4];
@@ -115,20 +120,23 @@ typedef struct {
 	GBPeripheralInfo peripheral;
 	int serial_counter;
 	uint32_t* last_framebuf;
+	SGBContext sgb;
 
 	uint8_t *rom;
 	size_t rom_len;
 	char rom_title[TITLE_LEN+1];
 	char rom_title_safe[TITLE_LEN+1];
 	int cgb_mode;
+	int sgb_mode;
 	int frame_counter;
 	uint8_t key_states;
 	int has_battery;
 
 	uint8_t cgb_bg_palette[0x40];
 	uint8_t cgb_obj_palette[0x40];
-
+	
 	uint8_t dmg_bootrom[0x100];
+	uint8_t sgb_bootrom[0x100];
 	uint8_t cgb_bootrom[0x900];
 
 	// hdma
@@ -213,6 +221,7 @@ static inline uint8_t* reg_n8(GBContext *gb, int n) {
 GBContext* init_context();
 void destroy_context(GBContext *gb);
 uint32_t* run_frame(GBContext *gb);
+void skip_bootrom(GBContext *gb);
 
 void key_state(GBContext *gb, int key, int state);
 void key_mask(GBContext *gb, uint8_t mask);

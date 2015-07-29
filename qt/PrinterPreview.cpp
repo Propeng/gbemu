@@ -8,6 +8,7 @@
 
 PrinterPreview::PrinterPreview(QImage **image, bool disableContinue) : QDialog() {
 	QVBoxLayout *vbox = new QVBoxLayout();
+	vbox->setSizeConstraint(QLayout::SetFixedSize);
 	
 	QLabel *label = new QLabel();
 	label->setAlignment(Qt::AlignCenter);

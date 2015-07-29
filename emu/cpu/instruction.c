@@ -15,7 +15,7 @@ int run_instruction(GBContext *gb) {
 
 	void (*bitop)(GBContext *gb, uint8_t *mem, uint8_t val);
 	int subop, soph5, soph3, sopl3, sopdir, sopval = 0;
-	uint8_t tmp;
+	uint8_t *tmp;
 
 	switch (opcode) {
 	case 0x00: //nop
@@ -770,9 +770,11 @@ int run_instruction(GBContext *gb) {
 			break;
 
 		case 0x6: //(hl)
-			tmp = *mem_ptr(gb, *reg_hl(gb), sopdir);
-			bitop(gb, &tmp, sopval);
-			if (bitop != cpu_bit) set_mem(gb, *reg_hl(gb), tmp);
+			tmp = mem_ptr(gb, *reg_hl(gb), sopdir);
+			if (tmp != NULL) {
+				bitop(gb, tmp, sopval);
+				if (bitop != cpu_bit) set_mem(gb, *reg_hl(gb), *tmp);
+			}
 			if (bitop == cpu_bit) gb->cycles += 4;
 			else gb->cycles += 8;
 			break;

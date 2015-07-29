@@ -83,6 +83,7 @@ int sound_length(GBContext *gb, int channel) {
 }
 
 float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
+	float volume = 0.3f;
 	double rate = (double)gb->settings.sample_rate;
 	double wavelen, mod, modf;
 	float vol;
@@ -121,7 +122,7 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 	vol = (float)ch->vol_playing / 0xF;
 	if (n <= 2) {
 		//printf("%u\n", (int)(ch->freq+ch->sweep_delta));
-		return mod > ch->duty ? -0.1f * vol : 0.1f * vol;
+		return mod > ch->duty ? (volume/-2) * vol : (volume/2) * vol;
 	} else if (n == 3 && (gb->io[IO_SND3_ENABLE] & (1<<7))) {
 		if (ch->freq == 0) return 0;
 		modf = mod / wavelen;
@@ -131,9 +132,9 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 		else
 			sample = gb->io[IO_SND3_WAVE+(waven/2)] & 0xF;
 		if (waven+1 == SND3_WAVELEN*2) ch->restart = 1;
-		return ((float)sample / 15.f * 0.1f * vol) - 0.05f;
+		return ((float)sample / 15.f * (volume/2) * vol) - (volume/4);
 	} else if (n == 4) {
-		return ch->noise_rand ? 0.05f * vol : -0.05f * vol;
+		return ch->noise_rand ? (volume/4) * vol : (volume/-4) * vol;
 	}
 	return 0;
 }
@@ -141,7 +142,7 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 void sound_tick(GBContext *gb, int cycles) {
 	double clocks_per_sample = (double)CLOCKS_PER_SEC / gb->settings.sample_rate;
 	float sample = 0;
-	float multiplier = gb->double_speed ? 2 : 1;
+	int multiplier = gb->double_speed ? 2 : 1;
 	int ch;
 	float vol_left = (float)(gb->io[IO_SND_VOLUME] & 0x7) / 7;
 	float vol_right = (float)((gb->io[IO_SND_VOLUME] >> 4) & 0x7) / 7;

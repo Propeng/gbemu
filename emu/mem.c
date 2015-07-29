@@ -4,17 +4,24 @@
 #include "mem.h"
 #include "video/video.h"
 #include "cpu/cpu.h"
+#include "sgb.h"
 
 uint8_t* mem_ptr(GBContext *gb, uint16_t addr, int direction) {
-	if (addr <= 0xFF && !gb->io[IO_BOOTROM] && !gb->cgb_mode) { //dmg boot rom
+	if (addr <= 0xFF && !gb->io[IO_BOOTROM] && !gb->cgb_mode && !gb->sgb_mode) { //dmg boot rom
+		if (direction == MEM_WRITE) return NULL;
 		return gb->dmg_bootrom+addr;
+	} else if (addr <= 0xFF && !gb->io[IO_BOOTROM] && !gb->cgb_mode && gb->sgb_mode) { //sgb boot rom
+		if (direction == MEM_WRITE) return NULL;
+		return gb->sgb_bootrom+addr;
 	} else if (addr <= 0xFF && !gb->io[IO_BOOTROM] && gb->cgb_mode) { //cgb boot rom low
+		if (direction == MEM_WRITE) return NULL;
 		return gb->cgb_bootrom+addr;
 	} else if (addr >= 0x200 && addr <= 0x8FF && !gb->io[IO_BOOTROM] && gb->cgb_mode) { //cgb boot rom high
+		if (direction == MEM_WRITE) return NULL;
 		return gb->cgb_bootrom+addr;
 	} else if (addr <= 0x7FFF) { //rom banks
 		if (gb->mbc_enabled) return gb->mbc_mem(gb, addr, direction);
-		if (direction == MEM_WRITE) return 0;
+		if (direction == MEM_WRITE) return NULL;
 		return gb->rom+addr;
 	} else if (addr >= 0x8000 && addr <= 0x9FFF) { //vram
 		if (gb->cgb_mode) {
@@ -65,7 +72,17 @@ uint8_t filter_io_read(GBContext *gb, uint16_t addr, uint8_t val) {
 			return gb->hdma_remaining & MASK_HDMA_LENGTH;
 		return val;
 	case IO_JOYP:
-		return ((val | MASK_JOYP_UNUSED) & 0xF0) | (get_keys_mask(gb) & 0x0F);
+		if (gb->sgb_mode && gb->sgb.joyp_mode) {
+			switch (gb->sgb.sel_joypad) {
+			case 1: return 0xFF;
+			case 2: return 0xFE;
+			case 3: return 0xFD;
+			case 4: return 0xFC;
+			default: return 0xFF;
+			}
+		}
+		if (gb->sgb.sel_joypad <= 1) return ((val | MASK_JOYP_UNUSED) & 0xF0) | (get_keys_mask(gb) & 0x0F);
+		else return ((val | MASK_JOYP_UNUSED) & 0xF0) | 0x0F; //TODO
 	case IO_BGPD:
 		if (!gb->cgb_mode) return val;
 		return gb->cgb_bg_palette[gb->io[IO_BGPI] & MASK_PI_INDEX];
@@ -91,9 +108,27 @@ uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t va
 
 	switch (ioaddr) {
 	case IO_BOOTROM: // switch into cgb's dmg simulation mode
-		if (val && !(gb->rom[0x0143] == 0x80 || gb->rom[0x0143])) gb->cgb_mode = 2;
+		if (val && gb->cgb_mode && !(gb->rom[0x0143] == 0x80 || gb->rom[0x0143] == 0xC0)) gb->cgb_mode = 2;
 		return val;
 	case IO_JOYP:
+		if (gb->sgb_mode && gb->io[IO_BOOTROM]) { //sgb bootrom does weird stuff with the joyp register
+			if (!(val & (MASK_JOYP_SELBTN | MASK_JOYP_SELDIR))) {
+				sgb_packet_start(gb);
+			} else if (gb->sgb.joyp_redirect && (val & MASK_JOYP_SELBTN) && (val & MASK_JOYP_SELDIR)) {
+				if (gb->sgb.joyp_redirect && (oldval & MASK_JOYP_SELBTN) && !(oldval & MASK_JOYP_SELDIR))
+					sgb_packet_bit(gb, 0);
+				else if (gb->sgb.joyp_redirect && !(oldval & MASK_JOYP_SELBTN) && (oldval & MASK_JOYP_SELDIR))
+					sgb_packet_bit(gb, 1);
+			} else { //not receiving commands
+				if ((val & MASK_JOYP_SELBTN) && (val & MASK_JOYP_SELDIR)) {
+					gb->sgb.sel_joypad++;
+					if (gb->sgb.sel_joypad > gb->sgb.n_joypads) gb->sgb.sel_joypad = 1;
+					gb->sgb.joyp_mode = 1;
+				} else {
+					gb->sgb.joyp_mode = 0;
+				}
+			}
+		}
 		return val & 0xF0;
 	case IO_DIV:
 		gb->div_counter = 0;

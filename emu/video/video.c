@@ -1,8 +1,10 @@
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "gb.h"
 #include "video/video.h"
 #include "cpu/cpu.h"
+#include "sgb.h"
 
 void update_mode(GBContext *gb, int mode) {
 	switch (mode) {
@@ -374,8 +376,24 @@ void draw_scanline(GBContext *gb, uint32_t *framebuf, int scanline) {
 	int win = gb->io[IO_LCDC] & MASK_LCDC_WINDISP;
 	int obj = gb->io[IO_LCDC] & MASK_LCDC_OBJDISP;
 	
-	for (x = 0; x < DISPLAY_WIDTH; x++) {
-		line[x] = gb->cgb_mode ? 0x00FFFFFF : gb->settings.dmg_palette[0];
+	if (gb->sgb_mode) {
+		if (gb->sgb.mask == 1) {
+			memcpy(line, gb->last_framebuf+(scanline*DISPLAY_WIDTH), DISPLAY_WIDTH*sizeof(uint32_t));
+			return;
+		} else if (gb->sgb.mask == 2) {
+			for (x = 0; x < DISPLAY_WIDTH; x++) {
+				line[x] = 0;
+			}
+			return;
+		}/* else {
+			for (x = 0; x < DISPLAY_WIDTH; x++) {
+				line[x] = 0;
+			}
+		}*/
+	} else {
+		for (x = 0; x < DISPLAY_WIDTH; x++) {
+			line[x] = gb->cgb_mode ? 0x00FFFFFF : gb->settings.dmg_palette[0];
+		}
 	}
 
 	if ((gb->io[IO_LCDC] & MASK_LCDC_ENABLE) == 0)
@@ -417,5 +435,6 @@ void draw_scanline(GBContext *gb, uint32_t *framebuf, int scanline) {
 		if (bg) draw_bg(gb, line, scanline, 1);
 		if (win) draw_window(gb, line, scanline, 1);
 		if (obj) draw_sprites(gb, line, scanline, 1);
+		if (gb->sgb_mode) sgb_color_scanline(gb, line, scanline);
 	}
 }

@@ -8,6 +8,7 @@
 #include <QtCore/qelapsedtimer.h>
 #include <QtCore/qmutex.h>
 #include "AudioBuffer.h"
+#include "settings.h"
 extern "C" {
 	#include "emu/gb.h"
 	#include "sdl/audio.h"
@@ -18,7 +19,7 @@ class EmulatorWidget : public QOpenGLWidget
 public:
 	static QMutex audio_mutex;
 	GBContext *gb;
-	EmulatorWidget();
+	EmulatorWidget(UserSettings *user_settings);
 	bool load_rom_file(const char* filename);
 	QSize sizeHint() const;
 	static void write_audio(float *samples, int n_bytes, void *data);
@@ -32,6 +33,7 @@ public:
 	void load_state();
 	void save_state();
 	QImage *printerBuf;
+	void immediate_settings();
 
 	int window_inactive;
 	
@@ -43,6 +45,7 @@ public:
 	void periph_disconnect();
 	void periph_printer();
 	void show_printer_buf(bool disableContinue = false);
+	void show_msg(const char *format, ...);
 
 protected:
 	//void paintEvent(QPaintEvent *paintEvent);
@@ -54,12 +57,14 @@ protected:
 	void closeEvent(QCloseEvent *closeEvent);
 
 private:
+	UserSettings *user_settings;
 	GLuint tex;
 	bool run_flag;
 	bool loaded;
 	float last_time;
 	//int last_sec;
 	QTimer *timer;
+	void apply_gb_settings();
 	bool load_boot_roms();
 	QElapsedTimer *elapsed;
 	AudioBuffer *audio_buf;
@@ -70,7 +75,6 @@ private:
 
 	char overlay_msg[1024];
 	int overlay_time;
-	void show_msg(const char *format, ...);
 };
 
 #endif

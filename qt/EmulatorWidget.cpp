@@ -13,9 +13,10 @@
 #include "GBWindow.h"
 #include "AudioBuffer.h"
 #include "PrinterPreview.h"
+#include "settings.h"
 extern "C" {
 	#include "emu/gb.h"
-	#include "emu/rom/rom.h"
+	#include "emu/rom.h"
 	#include "emu/video/video.h"
 	#include "emu/mbc/mbc.h"
 	#include "sdl/audio.h"
@@ -23,7 +24,8 @@ extern "C" {
 
 QMutex EmulatorWidget::audio_mutex;
 
-EmulatorWidget::EmulatorWidget() : QOpenGLWidget() {
+EmulatorWidget::EmulatorWidget(UserSettings *user_settings) : QOpenGLWidget() {
+	this->user_settings = user_settings;
 	//audio_file = fopen("samples", "wb");
 	audio_buf = NULL;
 	printerBuf = NULL;
@@ -34,10 +36,10 @@ EmulatorWidget::EmulatorWidget() : QOpenGLWidget() {
 	window_inactive = 0;
 
 	gb = init_context();
+	apply_gb_settings();
 	gb->settings.sample_rate = 48000;
 	gb->settings.emulate_lcd = 1;
 	gb->settings.boot_rom = load_boot_roms();
-	gb->settings.hw_type = GB_FORCE_CGB;
 	gb->settings.save_ram = save_ram_callback;
 	gb->settings.play_sound = write_audio;
 	gb->settings.callback_data = this;
@@ -61,11 +63,28 @@ EmulatorWidget::EmulatorWidget() : QOpenGLWidget() {
 	run_flag = false;
 }
 
+void EmulatorWidget::apply_gb_settings() {
+	gb->settings.cgb_hw = user_settings->cgb_hw;
+	gb->settings.sgb_hw = user_settings->sgb_hw;
+	gb->settings.dmg_hw = user_settings->dmg_hw;
+	immediate_settings();
+}
+
+void EmulatorWidget::immediate_settings() {
+	memcpy(gb->settings.dmg_palette, user_settings->dmg_palette, sizeof(gb->settings.dmg_palette));
+	gb->settings.emulate_lcd = user_settings->emulate_lcd;
+}
+
 bool EmulatorWidget::load_boot_roms() {
 	FILE *dmgrom = fopen("dmgboot.bin", "rb");
 	if (dmgrom == NULL) return false;
 	fread(gb->dmg_bootrom, 1, sizeof(gb->dmg_bootrom), dmgrom);
 	fclose(dmgrom);
+	
+	FILE *sgbrom = fopen("sgbboot.bin", "rb");
+	if (sgbrom == NULL) return false;
+	fread(gb->sgb_bootrom, 1, sizeof(gb->sgb_bootrom), sgbrom);
+	fclose(sgbrom);
 	
 	FILE *cgbrom = fopen("cgbboot.bin", "rb");
 	if (cgbrom == NULL) return false;
@@ -77,11 +96,15 @@ bool EmulatorWidget::load_boot_roms() {
 
 bool EmulatorWidget::load_rom_file(const char* filename) {
 	if (loaded && gb->has_battery) save_ram();
+	loaded = false;
+	
+	apply_gb_settings();
 
 	FILE *rom = fopen(filename, "rb");
+	if (rom == NULL) return false;
 	fseek(rom, 0, SEEK_END);
 	size_t len = ftell(rom);
-	fseek(rom, 0, 0);
+	fseek(rom, 0, SEEK_SET);
 	uint8_t *buf = (uint8_t*)malloc(len);
 	fread(buf, 1, len, rom);
 	fclose(rom);
@@ -99,6 +122,7 @@ bool EmulatorWidget::load_rom_file(const char* filename) {
 
 	if (run) {
 		if (gb->has_battery) load_ram();
+		if (user_settings->skip_bootrom) skip_bootrom(gb);
 
 		audio_buf->reset();
 		unpause_audio();
@@ -127,7 +151,7 @@ void EmulatorWidget::load_ram() {
 	
 	fseek(save_file, 0, SEEK_END);
 	buf.data_len = ftell(save_file);
-	fseek(save_file, 0, 0);
+	fseek(save_file, 0, SEEK_SET);
 
 	buf.data = (uint8_t*)malloc(buf.data_len);
 	fread(buf.data, 1, buf.data_len, save_file);
@@ -222,7 +246,11 @@ void EmulatorWidget::toggle_pause() {
 }
 
 void EmulatorWidget::reset() {
+	if (loaded && gb->has_battery) save_ram();
+	apply_gb_settings();
 	reset_gb(gb);
+	if (gb->has_battery) load_ram();
+	if (user_settings->skip_bootrom) skip_bootrom(gb);
 	gb->settings.paused = 0;
 }
 
@@ -245,6 +273,9 @@ void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
 		int read_bytes = 0;
 		while (read_bytes < len) {
 			read_bytes += widget->audio_buf->read((char*)stream + read_bytes, len - read_bytes);
+		}
+		if (!widget->user_settings->enable_sound) {
+			memset(stream, 0, len);
 		}
 	}
 }
@@ -324,63 +355,62 @@ void EmulatorWidget::paintGL() {
 		}
 	}
 	
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, tex);
+	if (loaded) {
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, tex);
 
-	glBegin(GL_QUADS);
-	glTexCoord2f(0, 0);
-	glVertex2f(0, 0);
-	glTexCoord2f(0, 1);
-	glVertex2f(0, DISPLAY_HEIGHT);
-	glTexCoord2f(1, 1);
-	glVertex2f(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-	glTexCoord2f(1, 0);
-	glVertex2f(DISPLAY_WIDTH, 0);
-	glEnd();
+		glBegin(GL_QUADS);
+		glTexCoord2f(0, 0);
+		glVertex2f(0, 0);
+		glTexCoord2f(0, 1);
+		glVertex2f(0, DISPLAY_HEIGHT);
+		glTexCoord2f(1, 1);
+		glVertex2f(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+		glTexCoord2f(1, 0);
+		glVertex2f(DISPLAY_WIDTH, 0);
+		glEnd();
+	}
 
 	if (last_time < overlay_time) {
 		QPainter painter(this);
+		painter.setRenderHints(QPainter::Antialiasing);
 		QFont font("Helvetica", 10, QFont::Bold);
 		painter.setFont(font);
-		float fade = overlay_time-last_time < 500 ? (overlay_time-last_time)/500 : 1;
-		painter.setPen(QPen(QColor(255, 0, 0, fade*255)));
 		QFontMetrics fm(font);
+		float fade = overlay_time-last_time < 500 ? (overlay_time-last_time)/500 : 1;
+		painter.setPen(QPen(QColor(255, 255, 255, fade*255)));
+		painter.drawText(6, height()-fm.height()-4, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
+		painter.setPen(QPen(QColor(210, 0, 0, fade*255)));
 		painter.drawText(5, height()-fm.height()-5, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
 	}
 }
 
 int EmulatorWidget::gb_button(int key) {
-	switch (key) {
-	case Qt::Key_Up:
-		return BTN_UP;
-	case Qt::Key_Down:
-		return BTN_DOWN;
-	case Qt::Key_Left:
-		return BTN_LEFT;
-	case Qt::Key_Right:
-		return BTN_RIGHT;
-	case Qt::Key_Space:
-		return BTN_START;
-	case Qt::Key_Control:
-		return BTN_SELECT;
-	case Qt::Key_X:
-		return BTN_A;
-	case Qt::Key_Z:
-		return BTN_B;
-	}
-	return 0;
+	int btn = 0;
+	if (key == user_settings->bindings[KEYBIND_UP])
+		btn |= BTN_UP;
+	if (key == user_settings->bindings[KEYBIND_DOWN])
+		btn |= BTN_DOWN;
+	if (key == user_settings->bindings[KEYBIND_LEFT])
+		btn |= BTN_LEFT;
+	if (key == user_settings->bindings[KEYBIND_RIGHT])
+		btn |= BTN_RIGHT;
+	if (key == user_settings->bindings[KEYBIND_START])
+		btn |= BTN_START;
+	if (key == user_settings->bindings[KEYBIND_SELECT])
+		btn |= BTN_SELECT;
+	if (key == user_settings->bindings[KEYBIND_A])
+		btn |= BTN_A;
+	if (key == user_settings->bindings[KEYBIND_B])
+		btn |= BTN_B;
+	return btn;
 }
 
 void EmulatorWidget::keyPressEvent(QKeyEvent *keyEvent) {
 	int btn = gb_button(keyEvent->key());
 	if (btn != 0) {
 		key_state(gb, btn, BTN_PRESSED);
-	}/* else if (loaded) {
-		if (keyEvent->key() == Qt::Key_F1) ((GBWindow*)parentWidget())->toggle_pause();
-		else if (keyEvent->key() == Qt::Key_F2) ((GBWindow*)parentWidget())->reset();
-		else if (keyEvent->key() == Qt::Key_F3) save_state();
-		else if (keyEvent->key() == Qt::Key_F4) load_state();
-	}*/
+	}
 }
 
 void EmulatorWidget::keyReleaseEvent(QKeyEvent *keyEvent) {
@@ -401,7 +431,7 @@ void EmulatorWidget::timer_tick() {
 			callbuf_data = NULL;
 		}
 
-		if (!window_inactive) {
+		if (!window_inactive || !user_settings->pause_unfocus) {
 			//setUpdatesEnabled(true);
 			run_flag = true;
 			update();

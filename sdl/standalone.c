@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <SDL.h>
 #include "emu/gb.h"
-#include "emu/rom/rom.h"
+#include "emu/rom.h"
 #include "emu/video/video.h"
 #include "emu/cpu/cpu.h"
 
@@ -104,7 +104,6 @@ void load_gb() {
 	fclose(rom);
 
 	gb = init_context();
-	gb->settings.hw_type = GB_FORCE_DMG;
 	gb->settings.emulate_lcd = 1;
 	gb->settings.save_ram = save_ram;
 	gb->settings.play_sound = play_sound;
