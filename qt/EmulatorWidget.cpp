@@ -9,6 +9,7 @@
 #include <QtWidgets/qmessagebox.h>
 #include <QtCore/qtimer.h>
 #include <QtCore/qelapsedtimer.h>
+#include <SFML/Window/Joystick.hpp>
 #include "EmulatorWidget.h"
 #include "GBWindow.h"
 #include "AudioBuffer.h"
@@ -19,7 +20,7 @@ extern "C" {
 	#include "emu/rom.h"
 	#include "emu/video/video.h"
 	#include "emu/mbc/mbc.h"
-	#include "sdl/audio.h"
+	//#include "sdl/audio.h"
 }
 
 QMutex EmulatorWidget::audio_mutex;
@@ -38,7 +39,6 @@ EmulatorWidget::EmulatorWidget(UserSettings *user_settings) : QOpenGLWidget() {
 	gb = init_context();
 	apply_gb_settings();
 	gb->settings.sample_rate = 48000;
-	gb->settings.emulate_lcd = 1;
 	gb->settings.boot_rom = load_boot_roms();
 	gb->settings.save_ram = save_ram_callback;
 	gb->settings.play_sound = write_audio;
@@ -55,6 +55,7 @@ EmulatorWidget::EmulatorWidget(UserSettings *user_settings) : QOpenGLWidget() {
 	timer->start(10);
 	
 	setFocusPolicy(Qt::StrongFocus);
+	setSizePolicy(QSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred));
 	resize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
 	setMinimumSize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
 	updateGeometry();
@@ -124,12 +125,12 @@ bool EmulatorWidget::load_rom_file(const char* filename) {
 		if (gb->has_battery) load_ram();
 		if (user_settings->skip_bootrom) skip_bootrom(gb);
 
-		audio_buf->reset();
-		unpause_audio();
+		//audio_buf->reset();
+		//unpause_audio();
 		loaded = true;
 	} else {
-		audio_buf->reset();
-		pause_audio();
+		//audio_buf->reset();
+		//pause_audio();
 		loaded = false;
 	}
 	gb->error = 0;
@@ -259,12 +260,15 @@ QSize EmulatorWidget::sizeHint() const {
 }
 
 void EmulatorWidget::init_audio() {
-	audio_buf = new AudioBuffer(SND_BUFLEN*sizeof(float));
+	/*audio_buf = new AudioBuffer(SND_BUFLEN*sizeof(float));
 	audio_buf->open(QIODevice::ReadWrite | QIODevice::Unbuffered);
-	init_sdl_audio(gb->settings.sample_rate, N_CHANNELS, SND_BUFLEN/N_CHANNELS, &sdl_callback, this);
+	init_sdl_audio(gb->settings.sample_rate, N_CHANNELS, SND_BUFLEN/N_CHANNELS, &sdl_callback, this);*/
+	audio_buf = new AudioBuffer(SND_BUFLEN*sizeof(int16_t), 2, gb->settings.sample_rate);
+	
+	audio_buf->play();
 }
 
-void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
+/*void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
 	EmulatorWidget *widget = (EmulatorWidget*)data;
 	memset(stream, 0, len);
 	QMutexLocker lock(&EmulatorWidget::audio_mutex);
@@ -278,16 +282,17 @@ void EmulatorWidget::sdl_callback(void *data, Uint8 *stream, int len) {
 			memset(stream, 0, len);
 		}
 	}
-}
+}*/
 
-void EmulatorWidget::write_audio(float *samples, int n_bytes, void *data) {
+void EmulatorWidget::write_audio(int16_t *samples, int n_bytes, void *data) {
 	EmulatorWidget *widget = (EmulatorWidget*)data;
 	QMutexLocker lock(&EmulatorWidget::audio_mutex);
-	//fwrite(samples, 1, n_bytes, widget->audio_file);
+	/*//fwrite(samples, 1, n_bytes, widget->audio_file);
 	//fflush(widget->audio_file);
 	if (widget->audio_buf != NULL && widget->audio_buf->isOpen()) {
 		widget->audio_buf->write((char*)samples, n_bytes);
-	}
+	}*/
+	widget->audio_buf->write(samples, n_bytes);
 }
 
 /*void EmulatorWidget::paintEvent(QPaintEvent *paintEvent) {
@@ -349,6 +354,7 @@ void EmulatorWidget::paintGL() {
 	run_flag = false;
 
 	if (loaded && flag && !gb->settings.paused) {
+		update_joystick();
 		uint32_t *framebuf = run_frame(gb);
 		if (framebuf != NULL) {
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, GL_BGRA, GL_UNSIGNED_BYTE, framebuf);
@@ -385,23 +391,55 @@ void EmulatorWidget::paintGL() {
 	}
 }
 
+void EmulatorWidget::update_joystick() {
+	int gbbtn;
+	sf::Joystick::update();
+	for (int i = 0; i < 8; i++) {
+		if (user_settings->bindings[i].device != -1) {
+			if (sf::Joystick::isConnected(user_settings->bindings[i].device)) {
+				switch (i) {
+				case KEYBIND_UP: gbbtn = BTN_UP; break;
+				case KEYBIND_DOWN: gbbtn = BTN_DOWN; break;
+				case KEYBIND_LEFT: gbbtn = BTN_LEFT; break;
+				case KEYBIND_RIGHT: gbbtn = BTN_RIGHT; break;
+				case KEYBIND_START: gbbtn = BTN_START; break;
+				case KEYBIND_SELECT: gbbtn = BTN_SELECT; break;
+				case KEYBIND_A: gbbtn = BTN_A; break;
+				case KEYBIND_B: gbbtn = BTN_B; break;
+				}
+
+				if (user_settings->bindings[i].type == KEYTYPE_BTN) {
+					key_state(gb, gbbtn, sf::Joystick::isButtonPressed(user_settings->bindings[i].device,
+						user_settings->bindings[i].key) ? BTN_PRESSED : BTN_UNPRESSED);
+				} else if (user_settings->bindings[i].type == KEYTYPE_AXISPOS) {
+					key_state(gb, gbbtn, sf::Joystick::getAxisPosition(user_settings->bindings[i].device,
+						(sf::Joystick::Axis)user_settings->bindings[i].key) > 25 ? BTN_PRESSED : BTN_UNPRESSED);
+				} else if (user_settings->bindings[i].type == KEYTYPE_AXISNEG) {
+					key_state(gb, gbbtn, sf::Joystick::getAxisPosition(user_settings->bindings[i].device,
+						(sf::Joystick::Axis)user_settings->bindings[i].key) < -25 ? BTN_PRESSED : BTN_UNPRESSED);
+				}
+			}
+		}
+	}
+}
+
 int EmulatorWidget::gb_button(int key) {
 	int btn = 0;
-	if (key == user_settings->bindings[KEYBIND_UP])
+	if (key == user_settings->bindings[KEYBIND_UP].key && user_settings->bindings[KEYBIND_UP].device == -1)
 		btn |= BTN_UP;
-	if (key == user_settings->bindings[KEYBIND_DOWN])
+	if (key == user_settings->bindings[KEYBIND_DOWN].key && user_settings->bindings[KEYBIND_DOWN].device == -1)
 		btn |= BTN_DOWN;
-	if (key == user_settings->bindings[KEYBIND_LEFT])
+	if (key == user_settings->bindings[KEYBIND_LEFT].key && user_settings->bindings[KEYBIND_LEFT].device == -1)
 		btn |= BTN_LEFT;
-	if (key == user_settings->bindings[KEYBIND_RIGHT])
+	if (key == user_settings->bindings[KEYBIND_RIGHT].key && user_settings->bindings[KEYBIND_RIGHT].device == -1)
 		btn |= BTN_RIGHT;
-	if (key == user_settings->bindings[KEYBIND_START])
+	if (key == user_settings->bindings[KEYBIND_START].key && user_settings->bindings[KEYBIND_START].device == -1)
 		btn |= BTN_START;
-	if (key == user_settings->bindings[KEYBIND_SELECT])
+	if (key == user_settings->bindings[KEYBIND_SELECT].key && user_settings->bindings[KEYBIND_SELECT].device == -1)
 		btn |= BTN_SELECT;
-	if (key == user_settings->bindings[KEYBIND_A])
+	if (key == user_settings->bindings[KEYBIND_A].key && user_settings->bindings[KEYBIND_A].device == -1)
 		btn |= BTN_A;
-	if (key == user_settings->bindings[KEYBIND_B])
+	if (key == user_settings->bindings[KEYBIND_B].key && user_settings->bindings[KEYBIND_B].device == -1)
 		btn |= BTN_B;
 	return btn;
 }
@@ -447,9 +485,10 @@ void EmulatorWidget::closeEvent(QCloseEvent *closeEvent) {
 	gb->settings.play_sound = NULL;
 	gb->settings.save_ram = NULL;
 
-	pause_audio();
-	SDL_LockAudio();
-	audio_buf->close();
+	//pause_audio();
+	//SDL_LockAudio();
+	//audio_buf->close();
+	delete audio_buf;
 	audio_buf = NULL;
 }
 

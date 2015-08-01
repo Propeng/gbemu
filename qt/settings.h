@@ -15,8 +15,18 @@ extern "C" {
 #define KEYBIND_A 6
 #define KEYBIND_B 7
 
+#define KEYTYPE_BTN 0
+#define KEYTYPE_AXISPOS 1
+#define KEYTYPE_AXISNEG 2
+
 typedef struct {
-	int bindings[8];
+	int device;
+	int type;
+	int key;
+} KeyBinding;
+
+typedef struct {
+	KeyBinding bindings[8];
 	GBType cgb_hw;
 	GBType sgb_hw;
 	GBType dmg_hw;

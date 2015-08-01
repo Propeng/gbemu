@@ -76,7 +76,7 @@ uint32_t* run_frame(GBContext *gb) {
 			compare_ly(gb, gb->io[IO_LCD_LY]);
 			video_mode(gb, 2);
 			run_cycles(gb, CLK_MODE2*multiplier);
-			draw_scanline(gb, framebuf, gb->io[IO_LCD_LY]);
+			if (!gb->skip_video) draw_scanline(gb, framebuf, gb->io[IO_LCD_LY]);
 			video_mode(gb, 3);
 			run_cycles(gb, CLK_MODE3*multiplier);
 			video_mode(gb, 0);
@@ -106,10 +106,17 @@ uint32_t* run_frame(GBContext *gb) {
 }
 
 void skip_bootrom(GBContext *gb) {
+	int nframes = 0;
 	void *snd_callback = gb->settings.play_sound;
 	gb->settings.play_sound = NULL;
+	run_frame(gb);
+	gb->skip_video = 1;
 	while (gb->io[IO_BOOTROM] == 0) {
 		run_frame(gb);
+		nframes++;
+		if (nframes >= FRAMES_PER_SEC*10) break; //if boot rom is still running after 10 seconds then it will probably never exit
 	}
+	gb->skip_video = 0;
+	run_frame(gb);
 	gb->settings.play_sound = snd_callback;
 }

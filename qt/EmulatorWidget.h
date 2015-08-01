@@ -11,7 +11,7 @@
 #include "settings.h"
 extern "C" {
 	#include "emu/gb.h"
-	#include "sdl/audio.h"
+	//#include "sdl/audio.h"
 }
 
 class EmulatorWidget : public QOpenGLWidget
@@ -22,8 +22,8 @@ public:
 	EmulatorWidget(UserSettings *user_settings);
 	bool load_rom_file(const char* filename);
 	QSize sizeHint() const;
-	static void write_audio(float *samples, int n_bytes, void *data);
-	static void sdl_callback(void *data, Uint8 *stream, int len);
+	static void write_audio(int16_t *samples, int n_bytes, void *data);
+	//static void sdl_callback(void *data, Uint8 *stream, int len);
 	static void save_ram_callback(void *data);
 	static void printer_callback(GBPeripheralDevice device, void *data, int width, int height, void *user_data);
 	void toggle_pause();
@@ -70,6 +70,7 @@ private:
 	AudioBuffer *audio_buf;
 	void init_audio();
 	void timer_tick();
+	void update_joystick();
 	int gb_button(int key);
 	FILE *audio_file;
 

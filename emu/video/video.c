@@ -185,7 +185,7 @@ uint32_t cgb_palette_color(GBContext *gb, uint8_t *palette, int palette_index) {
 	if (gb->settings.emulate_lcd) {
 		red = powf(red, 0.8);
 		green = powf(green, 0.7);
-		blue = powf(blue, 0.8);
+		blue = powf(blue, 0.6);
 
 		avg = (red+green+blue) / 3;
 		rw = red * 0.85f + green * 0.05f + blue * 0.05f + avg * 0.05f;
@@ -385,19 +385,21 @@ void draw_scanline(GBContext *gb, uint32_t *framebuf, int scanline) {
 				line[x] = 0;
 			}
 			return;
-		}/* else {
+		} else {
 			for (x = 0; x < DISPLAY_WIDTH; x++) {
-				line[x] = 0;
+				line[x] = gb->settings.dmg_palette[0];
 			}
-		}*/
+		}
 	} else {
 		for (x = 0; x < DISPLAY_WIDTH; x++) {
 			line[x] = gb->cgb_mode ? 0x00FFFFFF : gb->settings.dmg_palette[0];
 		}
 	}
 
-	if ((gb->io[IO_LCDC] & MASK_LCDC_ENABLE) == 0)
+	if ((gb->io[IO_LCDC] & MASK_LCDC_ENABLE) == 0) {
+		if (gb->sgb_mode) sgb_color_scanline(gb, line, scanline);
 		return;
+	}
 	
 	if (gb->cgb_mode == 1) { // cgb running cgb games
 		if (bg) {

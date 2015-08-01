@@ -31,7 +31,7 @@ private:
 	void set_default_colors();
 	void color_btn_click();
 	void binding_btn_click();
-	QString key_string(int key);
+	QString key_string(KeyBinding key);
 };
 
 #endif

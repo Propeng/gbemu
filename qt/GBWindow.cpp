@@ -58,14 +58,18 @@ void GBWindow::load_settings() {
 	}
 	if (settings_file == NULL) {
 		memset(&user_settings, 0, sizeof(UserSettings));
-		user_settings.bindings[KEYBIND_UP] = Qt::Key_Up;
-		user_settings.bindings[KEYBIND_DOWN] = Qt::Key_Down;
-		user_settings.bindings[KEYBIND_LEFT] = Qt::Key_Left;
-		user_settings.bindings[KEYBIND_RIGHT] = Qt::Key_Right;
-		user_settings.bindings[KEYBIND_START] = Qt::Key_Space;
-		user_settings.bindings[KEYBIND_SELECT] = Qt::Key_Control;
-		user_settings.bindings[KEYBIND_A] = Qt::Key_X;
-		user_settings.bindings[KEYBIND_B] = Qt::Key_Z;
+		for (int i = 0; i < 8; i++) {
+			user_settings.bindings[i].device = -1;
+			user_settings.bindings[i].type = 0;
+		}
+		user_settings.bindings[KEYBIND_UP].key = Qt::Key_W;
+		user_settings.bindings[KEYBIND_DOWN].key = Qt::Key_S;
+		user_settings.bindings[KEYBIND_LEFT].key = Qt::Key_A;
+		user_settings.bindings[KEYBIND_RIGHT].key = Qt::Key_D;
+		user_settings.bindings[KEYBIND_START].key = Qt::Key_Space;
+		user_settings.bindings[KEYBIND_SELECT].key = Qt::Key_Control;
+		user_settings.bindings[KEYBIND_A].key = Qt::Key_Slash;
+		user_settings.bindings[KEYBIND_B].key = Qt::Key_Period;
 		user_settings.cgb_hw = GB_CGB;
 		user_settings.sgb_hw = GB_SGB;
 		user_settings.dmg_hw = GB_DMG;
@@ -83,9 +87,10 @@ void GBWindow::load_settings() {
 }
 
 void GBWindow::setup_menus() {
-
 	// File
 	QMenu *file = menuBar()->addMenu("&File");
+	connect(file, &QMenu::aboutToShow, this, &GBWindow::menu_shown);
+	connect(file, &QMenu::aboutToHide, this, &GBWindow::menu_hidden);
 
 	connect(file->addAction("&Open ROM..."), &QAction::triggered, this, &GBWindow::open_rom);
 
@@ -109,6 +114,8 @@ void GBWindow::setup_menus() {
 
 	// Emulation
 	QMenu *emu = menuBar()->addMenu("&Emulation");
+	connect(emu, &QMenu::aboutToShow, this, &GBWindow::menu_shown);
+	connect(emu, &QMenu::aboutToHide, this, &GBWindow::menu_hidden);
 
 	pauseAction = emu->addAction("Pause");
 	connect(pauseAction, &QAction::triggered, this, &GBWindow::toggle_pause);
@@ -124,6 +131,16 @@ void GBWindow::setup_menus() {
 	resetAction->setShortcut(QKeySequence(Qt::Key_F2));
 	emu->addAction(resetAction);
 	emu->addSeparator();
+
+	QMenu *winSize = emu->addMenu("Window Size");
+	win1xAction = winSize->addAction("1x");
+	connect(win1xAction, &QAction::triggered, this, &GBWindow::set_window_size);
+	win2xAction = winSize->addAction("2x");
+	connect(win2xAction, &QAction::triggered, this, &GBWindow::set_window_size);
+	win3xAction = winSize->addAction("3x");
+	connect(win3xAction, &QAction::triggered, this, &GBWindow::set_window_size);
+	win4xAction = winSize->addAction("4x");
+	connect(win4xAction, &QAction::triggered, this, &GBWindow::set_window_size);
 
 	QMenu *periph = emu->addMenu("Serial Port");
 	
@@ -145,6 +162,23 @@ void GBWindow::setup_menus() {
 
 	// Help
 	QMenu *help = menuBar()->addMenu("&Help");
+	connect(help, &QMenu::aboutToShow, this, &GBWindow::menu_shown);
+	connect(help, &QMenu::aboutToHide, this, &GBWindow::menu_hidden);
+}
+
+void GBWindow::set_window_size() {
+	QAction *action = (QAction*)sender();
+	if (action == win1xAction)
+		widget->resize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+	else if (action == win2xAction)
+		widget->resize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
+	else if (action == win3xAction)
+		widget->resize(DISPLAY_WIDTH*3, DISPLAY_HEIGHT*3);
+	else if (action == win4xAction)
+		widget->resize(DISPLAY_WIDTH*4, DISPLAY_HEIGHT*4);
+	for (int i = 0; i < 10; i++)
+		QApplication::processEvents();
+	resize(widget->width(), widget->height() + menuBar()->height());
 }
 
 void GBWindow::open_rom() {
@@ -200,6 +234,14 @@ void GBWindow::focus_changed(Qt::ApplicationState state) {
 		//if (!paused_focus) toggle_pause();
 		widget->window_inactive = 1;
 	}
+}
+
+void GBWindow::menu_shown() {
+	widget->window_inactive = 1;
+}
+
+void GBWindow::menu_hidden() {
+	widget->window_inactive = 0;
 }
 
 void GBWindow::show_settings() {

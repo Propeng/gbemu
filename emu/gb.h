@@ -84,7 +84,7 @@ typedef struct {
 
 	int save_interval;
 	void (*save_ram)(void *data);
-	void (*play_sound)(float *samples, int n_bytes, void *data);
+	void (*play_sound)(int16_t *samples, int n_bytes, void *data);
 	void *callback_data;
 } GBSettings;
 
@@ -131,6 +131,7 @@ typedef struct {
 	int frame_counter;
 	uint8_t key_states;
 	int has_battery;
+	int skip_video;
 
 	uint8_t cgb_bg_palette[0x40];
 	uint8_t cgb_obj_palette[0x40];
@@ -179,7 +180,7 @@ typedef struct {
 	uint16_t registers[6];
 
 	// sound
-	float snd_buffer[SND_BUFLEN];
+	int16_t snd_buffer[SND_BUFLEN];
 	int snd_ptr;
 	double snd_cycles;
 	GBSoundChannel channels[4];

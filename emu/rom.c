@@ -54,7 +54,7 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 	memcpy(gb->rom_title, gb->rom+0x134, TITLE_LEN);
 	memcpy(gb->rom_title_safe, gb->rom+0x134, TITLE_LEN);
 	for (ch = gb->rom_title_safe; *ch != '\0'; ch++) {
-		if (*ch == '\\' || *ch == '/') *ch = ' ';
+		if (*ch == '\\' || *ch == '/') *ch = '_';
 	}
 
 	memcpy(gb->io+0x10, io_defaults1, sizeof(io_defaults1));

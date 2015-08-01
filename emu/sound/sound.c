@@ -83,7 +83,7 @@ int sound_length(GBContext *gb, int channel) {
 }
 
 float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
-	float volume = 0.3f;
+	float volumeh = 0.15f, volumel = -0.15f;
 	double rate = (double)gb->settings.sample_rate;
 	double wavelen, mod, modf;
 	float vol;
@@ -122,7 +122,7 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 	vol = (float)ch->vol_playing / 0xF;
 	if (n <= 2) {
 		//printf("%u\n", (int)(ch->freq+ch->sweep_delta));
-		return mod > ch->duty ? (volume/-2) * vol : (volume/2) * vol;
+		return mod > ch->duty ? volumel * vol : volumeh * vol;
 	} else if (n == 3 && (gb->io[IO_SND3_ENABLE] & (1<<7))) {
 		if (ch->freq == 0) return 0;
 		modf = mod / wavelen;
@@ -132,9 +132,9 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 		else
 			sample = gb->io[IO_SND3_WAVE+(waven/2)] & 0xF;
 		if (waven+1 == SND3_WAVELEN*2) ch->restart = 1;
-		return ((float)sample / 15.f * (volume/2) * vol) - (volume/4);
+		return ((float)sample / 15.f * volumeh * vol) - volumeh/2;
 	} else if (n == 4) {
-		return ch->noise_rand ? (volume/4) * vol : (volume/-4) * vol;
+		return ch->noise_rand ? volumeh/2 * vol : volumel/2 * vol;
 	}
 	return 0;
 }
@@ -159,14 +159,14 @@ void sound_tick(GBContext *gb, int cycles) {
 				if (gb->channels[ch].playing) {
 					sample = get_sample(gb, ch+1, gb->channels+ch);
 					if ((gb->io[IO_SND_CHMAP] & (1<<ch)) && (gb->io[IO_SND_CHMAP] & (1<<ch<<4))) {
-						gb->snd_buffer[gb->snd_ptr] += sample * vol_left * 0.8f;
-						gb->snd_buffer[gb->snd_ptr+1] += sample * vol_right * 0.8f;
+						gb->snd_buffer[gb->snd_ptr] += (sample * vol_left * 0.8f) * INT16_MAX;
+						gb->snd_buffer[gb->snd_ptr+1] += (sample * vol_right * 0.8f) * INT16_MAX;
 					} else if (gb->io[IO_SND_CHMAP] & (1<<ch)) {
-						gb->snd_buffer[gb->snd_ptr+1] += sample * vol_right;
-						gb->snd_buffer[gb->snd_ptr] += sample * vol_right * 0.2f;
+						gb->snd_buffer[gb->snd_ptr+1] += (sample * vol_right) * INT16_MAX;
+						gb->snd_buffer[gb->snd_ptr] += (sample * vol_right * 0.2f) * INT16_MAX;
 					} else if (gb->io[IO_SND_CHMAP] & (1<<ch<<4)) {
-						gb->snd_buffer[gb->snd_ptr] += sample * vol_left;
-						gb->snd_buffer[gb->snd_ptr+1] += sample * vol_left * 0.2f;
+						gb->snd_buffer[gb->snd_ptr] += (sample * vol_left) * INT16_MAX;
+						gb->snd_buffer[gb->snd_ptr+1] +=( sample * vol_left * 0.2f) * INT16_MAX;
 					}
 				}
 			}
@@ -211,7 +211,7 @@ void sound_tick(GBContext *gb, int cycles) {
 
 		gb->snd_ptr += N_CHANNELS;
 		if (gb->snd_ptr >= SND_BUFLEN) {
-			if (gb->settings.play_sound != NULL) gb->settings.play_sound(gb->snd_buffer, SND_BUFLEN*sizeof(float), gb->settings.callback_data);
+			if (gb->settings.play_sound != NULL) gb->settings.play_sound(gb->snd_buffer, SND_BUFLEN*sizeof(int16_t), gb->settings.callback_data);
 			gb->snd_ptr = 0;
 		}
 	}

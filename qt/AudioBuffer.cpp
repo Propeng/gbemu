@@ -1,28 +1,41 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <QtCore/qiodevice.h>
 #include <QtCore/qqueue.h>
+#include <SFML/Audio/SoundStream.hpp>
 #include "AudioBuffer.h"
 
-AudioBuffer::AudioBuffer(int buf_size) : QIODevice() {
+AudioBuffer::AudioBuffer(int buf_size, int channels, int sample_rate) : sf::SoundStream() {
 	this->buf_size = buf_size;
 	buf_ptr = 0;
 	buf_queue = new QQueue<char*>();
+
+	this->channels = channels;
+	this->sample_rate = sample_rate;
+	initialize(channels, sample_rate);
 }
 
 AudioBuffer::~AudioBuffer()  {
-	close();
+	while (buf_queue->length() > 0) {
+		free(buf_queue->dequeue());
+	}
+	buf_ptr = 0;
 }
 
-qint64 AudioBuffer::readData(char *data, qint64 maxSize) {
-	if (buf_queue->length() < 1) {
-		printf("Audio buffer underrun!\n");
-		return 0;
+bool AudioBuffer::onGetData(Chunk &data) {
+	if (buf_queue->empty()) {
+		data.samples = (sf::Int16*)malloc(buf_size);
+		memset((void*)data.samples, 0, buf_size);
+		data.sampleCount = buf_size / 2;
+		return true;
 	}
-	int len = maxSize > buf_size-buf_ptr ? buf_size-buf_ptr : maxSize;
+
+	int len = buf_size-buf_ptr;
 	char *buf = buf_queue->head();
-	memcpy(data, buf+buf_ptr, len);
+
+	data.samples = (sf::Int16*)malloc(len);
+	memcpy((void*)data.samples, buf+buf_ptr, len);
+	data.sampleCount = len / 2;
 
 	buf_ptr += len;
 	if (buf_ptr >= buf_size) {
@@ -37,11 +50,11 @@ qint64 AudioBuffer::readData(char *data, qint64 maxSize) {
 		free(buf);
 		buf_ptr = 0;
 	}
-	
-	return len;
+
+	return true;
 }
 
-qint64 AudioBuffer::writeData(const char *data, qint64 maxSize) {
+int AudioBuffer::write(const void *data, int maxSize) {
 	int len = maxSize > buf_size ? buf_size : maxSize;
 	char *buf = (char*)malloc(buf_size);
 	memset(buf, 0, buf_size);
@@ -50,66 +63,6 @@ qint64 AudioBuffer::writeData(const char *data, qint64 maxSize) {
 	return len;
 }
 
-bool AudioBuffer::atEnd() const {
-	return buf_queue->length() == 0;
-}
-
-qint64 AudioBuffer::bytesAvailable() const {
-	return buf_queue->length() * buf_size - buf_ptr;
-}
-
-qint64 AudioBuffer::bytesToWrite() const {
-	return 0;
-}
-
-bool AudioBuffer::canReadLine() const {
-	return false;
-}
-
-void AudioBuffer::close() {
-	while (buf_queue->length() > 0) {
-		free(buf_queue->dequeue());
-	}
-	buf_ptr = 0;
-}
-
-bool AudioBuffer::isSequential() const {
-	return false;
-}
-
-bool AudioBuffer::open(OpenMode mode) {
-	QIODevice::open(mode);
-	return true;
-}
-
-qint64 AudioBuffer::pos() const {
-	return 0;
-}
-
-bool AudioBuffer::reset() {
-	return false;
-}
-
-bool AudioBuffer::seek(qint64 pos) {
-	return false;
-}
-
-qint64 AudioBuffer::size() const {
-	return bytesAvailable();
-}
-
-bool AudioBuffer::waitForBytesWritten(int msecs) {
-	return false;
-}
-
-bool AudioBuffer::waitForReadyRead(int msecs) {
-	return false;
-}
-
-qint64 AudioBuffer::readLineData(char *data, qint64 maxSize) {
-	return 0;
-}
-
-bool AudioBuffer::isOpen() const {
-	return true;
+void AudioBuffer::onSeek(sf::Time timeOffset) {
+	return;
 }

@@ -24,21 +24,19 @@ private:
 	void load_settings();
 
 	EmulatorWidget *widget;
+	void set_window_size();
 	bool paused_focus;
-	QAction *saveStateAction;
-	QAction *loadStateAction;
-	QAction *pauseAction;
-	QAction *resetAction;
-	QAction *periphNone;
-	QAction *periphPrinter;
-	QAction *printerBuf;
-	QFileDialog *openDialog;
-	QFileDialog *screenshotDialog;
+	QAction *saveStateAction, *loadStateAction, *pauseAction, *resetAction, *periphNone, *periphPrinter, *printerBuf;
+	QAction *win1xAction, *win2xAction, *win3xAction, *win4xAction;
+	QFileDialog *openDialog, *screenshotDialog;
 	void setup_menus();
 	void open_rom();
 	void screenshot();
-	void focus_changed(Qt::ApplicationState state);
 	void show_settings();
+
+	void focus_changed(Qt::ApplicationState state);
+	void menu_shown();
+	void menu_hidden();
 
 	void periph_disconnect();
 	void periph_printer();

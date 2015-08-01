@@ -312,32 +312,46 @@ void SettingsWindow::binding_btn_click() {
 
 	KeyEntry entry(keyname);
 	if (entry.exec() == QDialog::Accepted) {
-		btn->setText(key_string(entry.pressed_key));
+		KeyBinding newkey;
+		newkey.device = entry.pressed_device;
+		newkey.type = entry.pressed_key_type;
+		newkey.key = entry.pressed_key;
+
+		btn->setText(key_string(newkey));
 		if (btn == upBtn)
-			user_settings->bindings[KEYBIND_UP] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_UP] = newkey;
 		else if (btn == downBtn)
-			user_settings->bindings[KEYBIND_DOWN] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_DOWN] = newkey;
 		else if (btn == leftBtn)
-			user_settings->bindings[KEYBIND_LEFT] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_LEFT] = newkey;
 		else if (btn == rightBtn)
-			user_settings->bindings[KEYBIND_RIGHT] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_RIGHT] = newkey;
 		else if (btn == startBtn)
-			user_settings->bindings[KEYBIND_START] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_START] = newkey;
 		else if (btn == selectBtn)
-			user_settings->bindings[KEYBIND_SELECT] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_SELECT] = newkey;
 		else if (btn == aBtn)
-			user_settings->bindings[KEYBIND_A] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_A] = newkey;
 		else if (btn == bBtn)
-			user_settings->bindings[KEYBIND_B] = entry.pressed_key;
+			user_settings->bindings[KEYBIND_B] = newkey;
 	}
 }
 
-QString SettingsWindow::key_string(int key) {
-	if (key == Qt::Key_Control)
-		return QString("Ctrl");
-	if (key == Qt::Key_Alt)
-		return QString("Alt");
-	if (key == Qt::Key_Shift)
-		return QString("Shift");
-	return QKeySequence(key).toString();
+QString SettingsWindow::key_string(KeyBinding key) {
+	if (key.device == -1) {
+		if (key.key == Qt::Key_Control)
+			return QString("Ctrl");
+		if (key.key == Qt::Key_Alt)
+			return QString("Alt");
+		if (key.key == Qt::Key_Shift)
+			return QString("Shift");
+		return QKeySequence(key.key).toString();
+	} else if (key.type == KEYTYPE_BTN) {
+		return QString().sprintf("Button %u:%u", key.device, key.key);
+	}  else if (key.type == KEYTYPE_AXISPOS) {
+		return QString().sprintf("Axis %u:%u+", key.device, key.key);
+	} else if (key.type == KEYTYPE_AXISNEG) {
+		return QString().sprintf("Axis %u:%u-", key.device, key.key);
+	}
+	return QString();
 }

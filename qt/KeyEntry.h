@@ -7,10 +7,13 @@ class KeyEntry : public QDialog
 {
 public:
 	KeyEntry(const char *key_name);
-	int pressed_key;
+	int pressed_key, pressed_key_type, pressed_device;
 
 protected:
 	void keyPressEvent(QKeyEvent *keyEvent);
+
+private:
+	void poll_joysticks();
 };
 
 #endif
