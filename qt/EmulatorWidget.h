@@ -19,13 +19,15 @@ class EmulatorWidget : public QOpenGLWidget
 public:
 	static QMutex audio_mutex;
 	GBContext *gb;
-	EmulatorWidget(UserSettings *user_settings);
+	QMainWindow *window;
+	EmulatorWidget(QMainWindow *window, UserSettings *user_settings);
 	bool load_rom_file(const char* filename);
 	QSize sizeHint() const;
 	static void write_audio(int16_t *samples, int n_bytes, void *data);
 	//static void sdl_callback(void *data, Uint8 *stream, int len);
 	static void save_ram_callback(void *data);
 	static void printer_callback(GBPeripheralDevice device, void *data, int width, int height, void *user_data);
+	static void frame_callback(uint32_t *frame, void *data);
 	void toggle_pause();
 	void reset();
 	void load_ram();
@@ -34,6 +36,7 @@ public:
 	void save_state();
 	QImage *printerBuf;
 	void immediate_settings();
+	bool show_frame;
 
 	int window_inactive;
 	
@@ -58,14 +61,16 @@ protected:
 
 private:
 	UserSettings *user_settings;
-	GLuint tex;
+	GLuint tex, frame_tex;
+	void hide_border();
+
 	bool run_flag;
 	bool loaded;
 	float last_time;
 	//int last_sec;
 	QTimer *timer;
 	void apply_gb_settings();
-	bool load_boot_roms();
+	void load_boot_roms();
 	QElapsedTimer *elapsed;
 	AudioBuffer *audio_buf;
 	void init_audio();

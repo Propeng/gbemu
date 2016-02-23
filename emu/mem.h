@@ -128,6 +128,7 @@
 #define set_mask(flag,mask,val) flag &= ~mask; flag |= val & mask;
 
 uint8_t* mem_ptr(GBContext *gb, uint16_t addr, int direction);
+uint8_t filter_io_read(GBContext *gb, uint16_t addr, uint8_t val);
 uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t val);
 uint8_t read_mem(GBContext *gb, uint16_t addr);
 uint16_t read_mem16(GBContext *gb, uint16_t addr);

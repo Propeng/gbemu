@@ -51,4 +51,5 @@ void mbc5_init(GBContext *gb) {
 	gb->mbc_mem = mbc5_mem;
 	gb->mbc_dump = mbc5_dump;
 	gb->mbc_load = mbc5_load;
+	mbc->rom_bank0 = 1;
 }

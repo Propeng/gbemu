@@ -4,8 +4,8 @@
 
 TEMPLATE = app
 TARGET = GBEmu
-INCLUDEPATH += ./ emu/ /usr/include/SDL2/
-LIBS += -lSDL2
+INCLUDEPATH += ./ emu/ /usr/include/SDL2/ /usr/include/SFML/
+LIBS += -lSDL2 -lsfml-system -lsfml-audio -lsfml-window
 QT += core gui widgets
 
 # Input
@@ -20,8 +20,6 @@ HEADERS += emu/gb.h \
            qt/PrinterPreview.h \
            qt/settings.h \
            qt/SettingsWindow.h \
-           sdl/audio.h \
-           sdl/input.h \
            emu/cpu/cpu.h \
            emu/cpu/instruction.h \
            emu/mbc/mbc.h \
@@ -40,9 +38,6 @@ SOURCES += emu/gb.c \
            qt/PrinterPreview.cpp \
            qt/qt.cpp \
            qt/SettingsWindow.cpp \
-           sdl/audio.c \
-           sdl/input.c \
-           sdl/standalone.c \
            emu/cpu/cpu.c \
            emu/cpu/instruction.c \
            emu/mbc/mbc.c \
@@ -50,6 +45,7 @@ SOURCES += emu/gb.c \
            emu/mbc/mbc2.c \
            emu/mbc/mbc3.c \
            emu/mbc/mbc5.c \
+           emu/mbc/gbcam.c \
            emu/peripheral/peripheral.c \
            emu/peripheral/printer.c \
            emu/sound/sound.c \

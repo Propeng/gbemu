@@ -17,14 +17,14 @@ extern "C" {
 GBWindow::GBWindow(QWidget *parent) : QMainWindow(parent) {
 	load_settings();
 
-	widget = new EmulatorWidget(&user_settings);
+	widget = new EmulatorWidget(this, &user_settings);
 	setup_menus();
 
 	setCentralWidget(widget);
 	activateWindow();
 	updateGeometry();
 	
-	openDialog = new QFileDialog(this, "Open ROM", "", "Gameboy ROMs (*.gb *.gbc);;All files (*.*)");
+	openDialog = new QFileDialog(this, "Open ROM", "F:\\Taken from New Linux\\Games\\Emulators\\VisualBoyAdvance\\gbroms", "Gameboy ROMs (*.gb *.gbc);;All files (*.*)");
 	openDialog->setAcceptMode(QFileDialog::AcceptOpen);
 	openDialog->setFileMode(QFileDialog::ExistingFile);
 	
@@ -56,7 +56,7 @@ void GBWindow::load_settings() {
 			fclose(settings_file);
 		}
 	}
-	if (settings_file == NULL) {
+	if (settings_file == NULL) { //set default settings
 		memset(&user_settings, 0, sizeof(UserSettings));
 		for (int i = 0; i < 8; i++) {
 			user_settings.bindings[i].device = -1;
@@ -80,6 +80,7 @@ void GBWindow::load_settings() {
 		user_settings.dmg_palette[1] = 0x00C0C0C0;
 		user_settings.dmg_palette[2] = 0x00808080;
 		user_settings.dmg_palette[3] = 0x00404040;
+		user_settings.use_bootrom = 1;
 		user_settings.skip_bootrom = 0;
 
 		save_settings();
@@ -167,15 +168,23 @@ void GBWindow::setup_menus() {
 }
 
 void GBWindow::set_window_size() {
+	int scale;
 	QAction *action = (QAction*)sender();
+
 	if (action == win1xAction)
-		widget->resize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+		scale = 1;
 	else if (action == win2xAction)
-		widget->resize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
+		scale = 2;
 	else if (action == win3xAction)
-		widget->resize(DISPLAY_WIDTH*3, DISPLAY_HEIGHT*3);
+		scale = 3;
 	else if (action == win4xAction)
-		widget->resize(DISPLAY_WIDTH*4, DISPLAY_HEIGHT*4);
+		scale = 4;
+	
+	if (widget->show_frame) {
+		widget->resize(SGB_DISPLAY_WIDTH*scale, SGB_DISPLAY_HEIGHT*scale);
+	} else {
+		widget->resize(DISPLAY_WIDTH*scale, DISPLAY_HEIGHT*scale);
+	}
 	for (int i = 0; i < 10; i++)
 		QApplication::processEvents();
 	resize(widget->width(), widget->height() + menuBar()->height());

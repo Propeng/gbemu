@@ -48,6 +48,15 @@ typedef struct {
 	uint8_t ram[BANK_SIZE_8KB*0x10];
 } MBC5Context;
 
+typedef struct {
+	uint8_t enable_ram;
+	uint8_t rom_bank0;
+	uint8_t rom_bank1;
+	uint8_t ram_bank;
+	uint8_t ram[BANK_SIZE_8KB*0x10];
+	uint8_t camio[BANK_SIZE_8KB];
+} GBCamContext;
+
 int mbc_init(GBContext *gb);
 size_t mbc_size(GBContext *gb);
 
@@ -76,5 +85,11 @@ uint8_t* mbc5_mem(GBContext *gb, uint16_t addr, int direction);
 void mbc5_dump(GBContext *gb, GBBuffer *buf);
 void mbc5_load(GBContext *gb, GBBuffer *buf);
 void mbc5_init(GBContext *gb);
+
+uint8_t* gbcam_mem(GBContext *gb, uint16_t addr, int direction);
+uint8_t gbcam_filter(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t val, int direction);
+void gbcam_dump(GBContext *gb, GBBuffer *buf);
+void gbcam_load(GBContext *gb, GBBuffer *buf);
+void gbcam_init(GBContext *gb);
 
 #endif

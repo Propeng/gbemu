@@ -97,6 +97,12 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 		memcpy(gb->registers, register_defaults_dmg, sizeof(register_defaults_dmg));
 	}
 
+	if (gb->cgb_mode && !gb->settings.cgb_bootrom && !(gb->rom[0x0143] == 0x80 || gb->rom[0x0143] == 0xC0)) {
+		memcpy(gb->cgb_bg_palette, cgb_compat_bg, sizeof(cgb_compat_bg));
+		memcpy(gb->cgb_obj_palette, cgb_compat_obj, sizeof(cgb_compat_obj));
+		gb->cgb_mode = 2;
+	}
+
 	gb->cartridge_type = gb->rom[0x0147];
 	gb->n_rom_banks = get_rom_size(gb->rom[0x0149]);
 
@@ -107,10 +113,10 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 	}
 
 	gb->has_battery = gb->cartridge_type == 0x03 || gb->cartridge_type == 0x06 || gb->cartridge_type == 0x09 || gb->cartridge_type == 0x0D || gb->cartridge_type == 0x0F ||
-		gb->cartridge_type == 0x10 || gb->cartridge_type == 0x13 || gb->cartridge_type == 0x17 || gb->cartridge_type == 0x1B || gb->cartridge_type == 0x1E;
+		gb->cartridge_type == 0x10 || gb->cartridge_type == 0x13 || gb->cartridge_type == 0x17 || gb->cartridge_type == 0x1B || gb->cartridge_type == 0x1E || gb->cartridge_type == 0xFC;
 	if (gb->has_battery) printf("External RAM is battery buffered.\n");
 
-	if (gb->settings.boot_rom) {
+	if ((gb->cgb_mode && gb->settings.cgb_bootrom) || (!gb->cgb_mode && !gb->sgb_mode && gb->settings.dmg_bootrom) || (gb->sgb_mode && gb->settings.sgb_bootrom)) {
 		*reg_pc(gb) = 0;
 		gb->io[IO_BOOTROM] = 0;
 	} else {
@@ -118,7 +124,17 @@ int load_rom(GBContext *gb, uint8_t *rom, size_t len) {
 	}
 
 	printf("Game is running in %s mode.\n", gb->cgb_mode ? "CGB" : (gb->sgb_mode ? "SGB" : "DMG"));
+
 	memset(gb->channels, 0, sizeof(gb->channels));
+	gb->io[IO_SND3_WAVE+1] = 0xFF;
+	gb->io[IO_SND3_WAVE+3] = 0xFF;
+	gb->io[IO_SND3_WAVE+5] = 0xFF;
+	gb->io[IO_SND3_WAVE+7] = 0xFF;
+	gb->io[IO_SND3_WAVE+9] = 0xFF;
+	gb->io[IO_SND3_WAVE+0xB] = 0xFF;
+	gb->io[IO_SND3_WAVE+0xD] = 0xFF;
+	gb->io[IO_SND3_WAVE+0xF] = 0xFF;
+
 	return 1;
 }
 

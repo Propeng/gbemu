@@ -58,7 +58,7 @@ uint8_t* mem_ptr(GBContext *gb, uint16_t addr, int direction) {
 
 uint8_t filter_io_read(GBContext *gb, uint16_t addr, uint8_t val) {
 	uint8_t ioaddr;
-	if ((addr <= 0x7FFF || addr >= 0x8000 && addr <= 0x9FFF) && gb->mbc_filter != NULL)
+	if ((addr <= 0x7FFF || addr >= 0xA000 && addr <= 0xBFFF) && gb->mbc_filter != NULL)
 		return gb->mbc_filter(gb, addr, 0, val, MEM_READ);
 	if (addr < 0xFF00 || addr > 0xFF7F)
 		return val;
@@ -100,7 +100,7 @@ uint8_t filter_io_read(GBContext *gb, uint16_t addr, uint8_t val) {
 
 uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t val) {
 	uint8_t ioaddr;
-	if ((addr <= 0x7FFF || (addr >= 0x8000 && addr <= 0x9FFF)) && gb->mbc_filter != NULL)
+	if ((addr <= 0x7FFF || (addr >= 0xA000 && addr <= 0xBFFF)) && gb->mbc_filter != NULL)
 		return gb->mbc_filter(gb, addr, oldval, val, MEM_WRITE);
 	if (addr < 0xFF00 || addr > 0xFF7F)
 		return val;
@@ -111,15 +111,17 @@ uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t va
 		if (val && gb->cgb_mode && !(gb->rom[0x0143] == 0x80 || gb->rom[0x0143] == 0xC0)) gb->cgb_mode = 2;
 		return val;
 	case IO_JOYP:
+		//printf("joyp %02x\n", val);
 		if (gb->sgb_mode && gb->io[IO_BOOTROM]) { //sgb bootrom does weird stuff with the joyp register
 			if (!(val & (MASK_JOYP_SELBTN | MASK_JOYP_SELDIR))) {
 				sgb_packet_start(gb);
+				//printf("Starting packet\n");
 			} else if (gb->sgb.joyp_redirect && (val & MASK_JOYP_SELBTN) && (val & MASK_JOYP_SELDIR)) {
 				if (gb->sgb.joyp_redirect && (oldval & MASK_JOYP_SELBTN) && !(oldval & MASK_JOYP_SELDIR))
 					sgb_packet_bit(gb, 0);
 				else if (gb->sgb.joyp_redirect && !(oldval & MASK_JOYP_SELBTN) && (oldval & MASK_JOYP_SELDIR))
 					sgb_packet_bit(gb, 1);
-			} else { //not receiving commands
+			} else if (!gb->sgb.joyp_redirect) { //not receiving commands
 				if ((val & MASK_JOYP_SELBTN) && (val & MASK_JOYP_SELDIR)) {
 					gb->sgb.sel_joypad++;
 					if (gb->sgb.sel_joypad > gb->sgb.n_joypads) gb->sgb.sel_joypad = 1;
@@ -234,7 +236,8 @@ uint8_t filter_io_write(GBContext *gb, uint16_t addr, uint8_t oldval, uint8_t va
 		return val;
 	case IO_SND3_VOL:
 		gb->channels[2].vol = ((val >> 5) & 3);
-		if (gb->channels[2].vol == 1) gb->channels[2].vol = 0xF;
+		if (gb->channels[2].vol == 0) gb->channels[2].vol = 0;
+		else if (gb->channels[2].vol == 1) gb->channels[2].vol = 0xF;
 		else if (gb->channels[2].vol == 2) gb->channels[2].vol = 0x8;
 		else if (gb->channels[2].vol == 3) gb->channels[2].vol = 0x4;
 		return val;

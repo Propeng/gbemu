@@ -3,10 +3,13 @@
 #include <cstdarg>
 #include <cerrno>
 #include <QtWidgets/qwidget.h>
+#include <QtWidgets/qapplication.h>
 #include <QtGui/qevent.h>
 #include <QtGui/qpainter.h>
 #include <QtGui/qimage.h>
+#include <QtWidgets/qmainwindow.h>
 #include <QtWidgets/qmessagebox.h>
+#include <QtWidgets/qmenubar.h>
 #include <QtCore/qtimer.h>
 #include <QtCore/qelapsedtimer.h>
 #include <SFML/Window/Joystick.hpp>
@@ -20,13 +23,15 @@ extern "C" {
 	#include "emu/rom.h"
 	#include "emu/video/video.h"
 	#include "emu/mbc/mbc.h"
+	#include "emu/sgb.h"
 	//#include "sdl/audio.h"
 }
 
 QMutex EmulatorWidget::audio_mutex;
 
-EmulatorWidget::EmulatorWidget(UserSettings *user_settings) : QOpenGLWidget() {
+EmulatorWidget::EmulatorWidget(QMainWindow *window, UserSettings *user_settings) : QOpenGLWidget() {
 	this->user_settings = user_settings;
+	this->window = window;
 	//audio_file = fopen("samples", "wb");
 	audio_buf = NULL;
 	printerBuf = NULL;
@@ -35,13 +40,14 @@ EmulatorWidget::EmulatorWidget(UserSettings *user_settings) : QOpenGLWidget() {
 	overlay_msg[0] = '\0';
 	overlay_time = 0;
 	window_inactive = 0;
+	show_frame = false;
 
 	gb = init_context();
 	apply_gb_settings();
 	gb->settings.sample_rate = 48000;
-	gb->settings.boot_rom = load_boot_roms();
 	gb->settings.save_ram = save_ram_callback;
 	gb->settings.play_sound = write_audio;
+	gb->settings.show_frame = frame_callback;
 	gb->settings.callback_data = this;
 	init_audio();
 
@@ -68,6 +74,13 @@ void EmulatorWidget::apply_gb_settings() {
 	gb->settings.cgb_hw = user_settings->cgb_hw;
 	gb->settings.sgb_hw = user_settings->sgb_hw;
 	gb->settings.dmg_hw = user_settings->dmg_hw;
+	if (user_settings->use_bootrom) {
+		load_boot_roms();
+	} else {
+		gb->settings.dmg_bootrom = 0;
+		gb->settings.cgb_bootrom = 0;
+		gb->settings.sgb_bootrom = 0;
+	}
 	immediate_settings();
 }
 
@@ -76,28 +89,39 @@ void EmulatorWidget::immediate_settings() {
 	gb->settings.emulate_lcd = user_settings->emulate_lcd;
 }
 
-bool EmulatorWidget::load_boot_roms() {
+void EmulatorWidget::load_boot_roms() {
 	FILE *dmgrom = fopen("dmgboot.bin", "rb");
-	if (dmgrom == NULL) return false;
-	fread(gb->dmg_bootrom, 1, sizeof(gb->dmg_bootrom), dmgrom);
-	fclose(dmgrom);
+	if (dmgrom == NULL) {
+		gb->settings.dmg_bootrom = 0;
+	} else {
+		gb->settings.dmg_bootrom = 1;
+		fread(gb->dmg_bootrom, 1, sizeof(gb->dmg_bootrom), dmgrom);
+		fclose(dmgrom);
+	}
 	
 	FILE *sgbrom = fopen("sgbboot.bin", "rb");
-	if (sgbrom == NULL) return false;
-	fread(gb->sgb_bootrom, 1, sizeof(gb->sgb_bootrom), sgbrom);
-	fclose(sgbrom);
+	if (sgbrom == NULL) {
+		gb->settings.sgb_bootrom = 0;
+	} else {
+		gb->settings.sgb_bootrom = 1;
+		fread(gb->sgb_bootrom, 1, sizeof(gb->sgb_bootrom), sgbrom);
+		fclose(sgbrom);
+	}
 	
 	FILE *cgbrom = fopen("cgbboot.bin", "rb");
-	if (cgbrom == NULL) return false;
-	fread(gb->cgb_bootrom, 1, sizeof(gb->cgb_bootrom), cgbrom);
-	fclose(cgbrom);
-
-	return true;
+	if (cgbrom == NULL) {
+		gb->settings.cgb_bootrom = 0;
+	} else {
+		gb->settings.cgb_bootrom = 1;
+		fread(gb->cgb_bootrom, 1, sizeof(gb->cgb_bootrom), cgbrom);
+		fclose(cgbrom);
+	}
 }
 
 bool EmulatorWidget::load_rom_file(const char* filename) {
 	if (loaded && gb->has_battery) save_ram();
 	loaded = false;
+	hide_border();
 	
 	apply_gb_settings();
 
@@ -244,6 +268,7 @@ void EmulatorWidget::save_ram_callback(void *data) {
 
 void EmulatorWidget::toggle_pause() {
 	gb->settings.paused = !gb->settings.paused;
+	*reg_pc(gb) = 0x0100;
 }
 
 void EmulatorWidget::reset() {
@@ -253,10 +278,12 @@ void EmulatorWidget::reset() {
 	if (gb->has_battery) load_ram();
 	if (user_settings->skip_bootrom) skip_bootrom(gb);
 	gb->settings.paused = 0;
+	hide_border();
 }
 
 QSize EmulatorWidget::sizeHint() const {
-	return QSize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
+	//return QSize(DISPLAY_WIDTH*2, DISPLAY_HEIGHT*2);
+	return QSize(width(), height());
 }
 
 void EmulatorWidget::init_audio() {
@@ -264,7 +291,6 @@ void EmulatorWidget::init_audio() {
 	audio_buf->open(QIODevice::ReadWrite | QIODevice::Unbuffered);
 	init_sdl_audio(gb->settings.sample_rate, N_CHANNELS, SND_BUFLEN/N_CHANNELS, &sdl_callback, this);*/
 	audio_buf = new AudioBuffer(SND_BUFLEN*sizeof(int16_t), 2, gb->settings.sample_rate);
-	
 	audio_buf->play();
 }
 
@@ -292,7 +318,8 @@ void EmulatorWidget::write_audio(int16_t *samples, int n_bytes, void *data) {
 	if (widget->audio_buf != NULL && widget->audio_buf->isOpen()) {
 		widget->audio_buf->write((char*)samples, n_bytes);
 	}*/
-	widget->audio_buf->write(samples, n_bytes);
+	if (widget->user_settings->enable_sound)
+		widget->audio_buf->write(samples, n_bytes);
 }
 
 /*void EmulatorWidget::paintEvent(QPaintEvent *paintEvent) {
@@ -338,8 +365,15 @@ void EmulatorWidget::initializeGL() {
 
 	void *buf = malloc(DISPLAY_WIDTH*DISPLAY_HEIGHT*4);
 	memset(buf, 0, DISPLAY_WIDTH*DISPLAY_HEIGHT*4);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, GL_BGRA, GL_UNSIGNED_BYTE, buf);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, GL_BGR, GL_UNSIGNED_BYTE, buf);
 	free(buf);
+	
+	glGenTextures(1, &frame_tex);
+	glBindTexture(GL_TEXTURE_2D, frame_tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
 void EmulatorWidget::resizeGL(int w, int h) {
@@ -348,37 +382,90 @@ void EmulatorWidget::resizeGL(int w, int h) {
 }
 
 void EmulatorWidget::paintGL() {
-	glClear(GL_COLOR_BUFFER_BIT);
+	QPainter painter(this);
+	painter.beginNativePainting();
+
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_ACCUM_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	
 	bool flag = run_flag;
 	run_flag = false;
+	
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_BLEND);
 
 	if (loaded && flag && !gb->settings.paused) {
 		update_joystick();
 		uint32_t *framebuf = run_frame(gb);
 		if (framebuf != NULL) {
+			glBindTexture(GL_TEXTURE_2D, tex);
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, GL_BGRA, GL_UNSIGNED_BYTE, framebuf);
 		}
 	}
 	
 	if (loaded) {
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, tex);
+		if (show_frame) {
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			glOrtho(0, SGB_DISPLAY_WIDTH, SGB_DISPLAY_HEIGHT, 0, -1, 1);
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
 
-		glBegin(GL_QUADS);
-		glTexCoord2f(0, 0);
-		glVertex2f(0, 0);
-		glTexCoord2f(0, 1);
-		glVertex2f(0, DISPLAY_HEIGHT);
-		glTexCoord2f(1, 1);
-		glVertex2f(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-		glTexCoord2f(1, 0);
-		glVertex2f(DISPLAY_WIDTH, 0);
-		glEnd();
+			glClearColor(gb->sgb.backdrop[0], gb->sgb.backdrop[1], gb->sgb.backdrop[2], 1);
+			glClear(GL_COLOR_BUFFER_BIT);
+			
+			glBindTexture(GL_TEXTURE_2D, tex);
+			glBegin(GL_QUADS);
+			glTexCoord2f(0, 0);
+			glVertex2f(SGB_FRAME_WIDTH, SGB_FRAME_HEIGHT);
+			glTexCoord2f(0, 1);
+			glVertex2f(SGB_FRAME_WIDTH, SGB_DISPLAY_HEIGHT-SGB_FRAME_HEIGHT);
+			glTexCoord2f(1, 1);
+			glVertex2f(SGB_DISPLAY_WIDTH-SGB_FRAME_WIDTH, SGB_DISPLAY_HEIGHT-SGB_FRAME_HEIGHT);
+			glTexCoord2f(1, 0);
+			glVertex2f(SGB_DISPLAY_WIDTH-SGB_FRAME_WIDTH, SGB_FRAME_HEIGHT);
+			glEnd();
+
+			glBindTexture(GL_TEXTURE_2D, frame_tex);
+			glBegin(GL_QUADS);
+			glTexCoord2f(0, 0);
+			glVertex2f(0, 0);
+			glTexCoord2f(0, 1);
+			glVertex2f(0, SGB_DISPLAY_HEIGHT);
+			glTexCoord2f(1, 1);
+			glVertex2f(SGB_DISPLAY_WIDTH, SGB_DISPLAY_HEIGHT);
+			glTexCoord2f(1, 0);
+			glVertex2f(SGB_DISPLAY_WIDTH, 0);
+			glEnd();
+		} else {
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			glOrtho(0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, -1, 1);
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+
+			glBindTexture(GL_TEXTURE_2D, tex);
+			glBegin(GL_QUADS);
+			glTexCoord2f(0, 0);
+			glVertex2f(0, 0);
+			glTexCoord2f(0, 1);
+			glVertex2f(0, DISPLAY_HEIGHT);
+			glTexCoord2f(1, 1);
+			glVertex2f(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+			glTexCoord2f(1, 0);
+			glVertex2f(DISPLAY_WIDTH, 0);
+			glEnd();
+		}
 	}
 
+	painter.endNativePainting();
 	if (last_time < overlay_time) {
-		QPainter painter(this);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+
 		painter.setRenderHints(QPainter::Antialiasing);
 		QFont font("Helvetica", 10, QFont::Bold);
 		painter.setFont(font);
@@ -388,6 +475,40 @@ void EmulatorWidget::paintGL() {
 		painter.drawText(6, height()-fm.height()-4, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
 		painter.setPen(QPen(QColor(210, 0, 0, fade*255)));
 		painter.drawText(5, height()-fm.height()-5, width()-5, fm.height()+5, Qt::AlignTop | Qt::AlignLeft, overlay_msg);
+
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+		glPopAttrib();
+	}
+}
+
+void EmulatorWidget::frame_callback(uint32_t *frame, void *data) {
+	EmulatorWidget *widget = (EmulatorWidget*)data;
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, widget->frame_tex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SGB_DISPLAY_WIDTH, SGB_DISPLAY_HEIGHT, 0, GL_BGRA, GL_UNSIGNED_BYTE, frame);
+	
+	if (!widget->show_frame) {
+		float scalew = widget->width()/DISPLAY_WIDTH;
+		float scaleh = widget->height()/DISPLAY_HEIGHT;
+		//widget->setMinimumSize(SGB_DISPLAY_WIDTH, SGB_DISPLAY_HEIGHT); //won't set minimum size because qt is fucking broken as hell
+		widget->resize(widget->width() + SGB_FRAME_WIDTH*2*scalew, widget->height() + SGB_FRAME_HEIGHT*2*scaleh);
+		widget->window->resize(widget->width(), widget->height() + widget->window->menuBar()->height());
+		widget->show_frame = true;
+	}
+}
+
+void EmulatorWidget::hide_border() {
+	if (show_frame) {
+		float scalew = width()/SGB_DISPLAY_WIDTH;
+		float scaleh = height()/SGB_DISPLAY_HEIGHT;
+		//setMinimumSize(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+		resize(DISPLAY_WIDTH*scalew, DISPLAY_HEIGHT*scaleh);
+		window->resize(width(), height() + window->menuBar()->height());
+		show_frame = false;
 	}
 }
 

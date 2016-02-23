@@ -58,7 +58,7 @@
 
 
 #define N_CHANNELS 2
-#define SND_BUFLEN 1024*N_CHANNELS
+#define SND_BUFLEN 2048*N_CHANNELS
 
 static const uint16_t register_defaults_dmg[] = { 0x01B0, 0x0013, 0x00D8, 0x014D, 0xFFFE, 0x0100 };
 static const uint16_t register_defaults_cgb[] = { 0x1180, 0x0000, 0xFF56, 0x000D, 0xFFFE, 0x0100 };
@@ -66,6 +66,9 @@ static const uint8_t io_defaults1[] = { 0x80, 0xBF, 0xF3, 0x00, 0xBF, 0x00, 0x3F
 static const uint8_t io_defaults2[] = { 0x91, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFC, 0xFF, 0xFF };
 static const uint16_t rst_jump[] = { 0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38 };
 static const uint16_t int_jump[] = { 0x40, 0x48, 0x50, 0x58, 0x60 };
+
+static const uint8_t cgb_compat_bg[] = { 0xFF, 0x7F, 0xEF, 0x1B, 0x80, 0x61, 0x00, 0x00 };
+static const uint8_t cgb_compat_obj[] = { 0xFF, 0x7F, 0x1F, 0x42, 0xF2, 0x1C, 0x00, 0x00 };
 
 typedef enum {
 	GB_CGB, GB_SGB, GB_DMG,
@@ -75,7 +78,7 @@ typedef struct {
 	GBType cgb_hw;
 	GBType sgb_hw;
 	GBType dmg_hw;
-	int boot_rom;
+	int dmg_bootrom, cgb_bootrom, sgb_bootrom;
 	int paused;
 	uint32_t dmg_palette[4];
 	int emulate_lcd;
@@ -85,6 +88,7 @@ typedef struct {
 	int save_interval;
 	void (*save_ram)(void *data);
 	void (*play_sound)(int16_t *samples, int n_bytes, void *data);
+	void (*show_frame)(uint32_t *frame, void *data);
 	void *callback_data;
 } GBSettings;
 

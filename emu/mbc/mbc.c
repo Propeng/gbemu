@@ -31,6 +31,12 @@ int mbc_init(GBContext *gb) {
 		mbc5_init(gb);
 		gb->mbc_enabled = 1;
 		return 1;
+
+	case 0xFC:
+		printf("Controller type: Gameboy Camera\n");
+		gbcam_init(gb);
+		gb->mbc_enabled = 1;
+		return 1;
 	}
 	return 0;
 }
@@ -45,6 +51,8 @@ size_t mbc_size(GBContext *gb) {
 		return sizeof(MBC3Context);
 	case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1E:
 		return sizeof(MBC5Context);
+	case 0xFC:
+		return sizeof(GBCamContext);
 	}
 	return 0;
 }

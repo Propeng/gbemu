@@ -772,6 +772,7 @@ int run_instruction(GBContext *gb) {
 		case 0x6: //(hl)
 			tmp = mem_ptr(gb, *reg_hl(gb), sopdir);
 			if (tmp != NULL) {
+				*tmp = filter_io_read(gb, *reg_hl(gb), *tmp);
 				bitop(gb, tmp, sopval);
 				if (bitop != cpu_bit) set_mem(gb, *reg_hl(gb), *tmp);
 			}

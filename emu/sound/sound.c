@@ -83,7 +83,7 @@ int sound_length(GBContext *gb, int channel) {
 }
 
 float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
-	float volumeh = 0.15f, volumel = -0.15f;
+	float volumeh = 0.2f, volumel = -0.2f;
 	double rate = (double)gb->settings.sample_rate;
 	double wavelen, mod, modf;
 	float vol;
@@ -125,16 +125,17 @@ float get_sample(GBContext *gb, int n, GBSoundChannel *ch) {
 		return mod > ch->duty ? volumel * vol : volumeh * vol;
 	} else if (n == 3 && (gb->io[IO_SND3_ENABLE] & (1<<7))) {
 		if (ch->freq == 0) return 0;
+		vol = (float)ch->vol / 0xF;
 		modf = mod / wavelen;
-		waven = (int)(modf * SND3_WAVELEN*2);
+		waven = (int)(modf * SND3_WAVELEN*2) % (SND3_WAVELEN*2);
 		if (waven % 2 == 0)
 			sample = gb->io[IO_SND3_WAVE+(waven/2)] >> 4;
 		else
 			sample = gb->io[IO_SND3_WAVE+(waven/2)] & 0xF;
-		if (waven+1 == SND3_WAVELEN*2) ch->restart = 1;
+		//if (waven+1 == SND3_WAVELEN*2) ch->restart = 1;
 		return ((float)sample / 15.f * volumeh * vol) - volumeh/2;
 	} else if (n == 4) {
-		return ch->noise_rand ? volumeh/2 * vol : volumel/2 * vol;
+		return ch->noise_rand ? volumeh/1.5 * vol : volumel/1.5 * vol;
 	}
 	return 0;
 }
@@ -204,6 +205,7 @@ void sound_tick(GBContext *gb, int cycles) {
 				if (gb->channels[ch].length >= 0 && gb->channels[ch].counter >= gb->channels[ch].length) {
 					gb->channels[ch].counter = 0;
 					gb->channels[ch].playing = 0;
+					gb->channels[ch].freq = 0;
 				}
 			}
 		}

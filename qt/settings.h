@@ -34,6 +34,7 @@ typedef struct {
 	int pause_unfocus;
 	int emulate_lcd;
 	uint32_t dmg_palette[4];
+	int use_bootrom;
 	int skip_bootrom;
 } UserSettings;
 

@@ -26,7 +26,7 @@ SettingsWindow::SettingsWindow(UserSettings *user_settings) : QDialog() {
 	QGridLayout *hwTypeLayout = new QGridLayout();
 	hwTypeLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 	
-	hwTypeLayout->addWidget(new QLabel("Run CGB games on:"), 0, 0);
+	hwTypeLayout->addWidget(new QLabel("Run Gameboy Color games on:"), 0, 0);
 	cgbcgbRadio = new QRadioButton("CGB");
 	cgbcgbRadio->setChecked(user_settings->cgb_hw == GB_CGB);
 	connect(cgbcgbRadio, &QRadioButton::clicked, this, &SettingsWindow::update_settings);
@@ -40,7 +40,7 @@ SettingsWindow::SettingsWindow(UserSettings *user_settings) : QDialog() {
 	connect(cgbdmgRadio, &QRadioButton::clicked, this, &SettingsWindow::update_settings);
 	hwTypeLayout->addWidget(cgbdmgRadio, 0, 3);
 	
-	hwTypeLayout->addWidget(new QLabel("Run SGB games on:"), 1, 0);
+	hwTypeLayout->addWidget(new QLabel("Run Super Gameboy games on:"), 1, 0);
 	sgbcgbRadio = new QRadioButton("CGB");
 	sgbcgbRadio->setChecked(user_settings->sgb_hw == GB_CGB);
 	connect(sgbcgbRadio, &QRadioButton::clicked, this, &SettingsWindow::update_settings);
@@ -54,7 +54,7 @@ SettingsWindow::SettingsWindow(UserSettings *user_settings) : QDialog() {
 	connect(sgbdmgRadio, &QRadioButton::clicked, this, &SettingsWindow::update_settings);
 	hwTypeLayout->addWidget(sgbdmgRadio, 1, 3);
 	
-	hwTypeLayout->addWidget(new QLabel("Run DMG games on:"), 2, 0);
+	hwTypeLayout->addWidget(new QLabel("Run Gameboy games on:"), 2, 0);
 	dmgcgbRadio = new QRadioButton("CGB");
 	dmgcgbRadio->setChecked(user_settings->dmg_hw == GB_CGB);
 	connect(dmgcgbRadio, &QRadioButton::clicked, this, &SettingsWindow::update_settings);
@@ -84,7 +84,12 @@ SettingsWindow::SettingsWindow(UserSettings *user_settings) : QDialog() {
 	hwTypeGroup->setLayout(hwTypeLayout);
 	generalLayout->addWidget(hwTypeGroup);
 
-	skipBootChk = new QCheckBox("Skip start-up sequence when using boot ROMs");
+	useBootChk = new QCheckBox("Use boot ROMs");
+	useBootChk->setChecked(user_settings->use_bootrom);
+	connect(useBootChk, &QCheckBox::clicked, this, &SettingsWindow::update_settings);
+	generalLayout->addWidget(useBootChk);
+
+	skipBootChk = new QCheckBox("Skip startup logo animation when using boot ROMs");
 	skipBootChk->setChecked(user_settings->skip_bootrom);
 	connect(skipBootChk, &QCheckBox::clicked, this, &SettingsWindow::update_settings);
 	generalLayout->addWidget(skipBootChk);
@@ -242,6 +247,7 @@ void SettingsWindow::update_settings() {
 	else if (dmgsgbRadio->isChecked()) user_settings->dmg_hw = GB_SGB;
 	else if (dmgdmgRadio->isChecked()) user_settings->dmg_hw = GB_DMG;
 	
+	user_settings->use_bootrom = useBootChk->isChecked();
 	user_settings->skip_bootrom = skipBootChk->isChecked();
 	user_settings->pause_unfocus = pauseUnfocusChk->isChecked();
 	user_settings->enable_sound = enableSoundChk->isChecked();

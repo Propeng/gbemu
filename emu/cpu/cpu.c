@@ -69,13 +69,11 @@ void do_interrupts(GBContext *gb) {
 	}
 }
 
-int print = 0;
-
 void cpu_cycle(GBContext *gb) {
 	if (!gb->halted) {
-		if (*reg_pc(gb) == 0x13d4)
-			print = 1;
-		//printf("%04X\n", *reg_pc(gb));
+		//if (*reg_pc(gb) == 0x100)
+		//	gb=gb;
+		//if (gb->io[IO_BOOTROM]) printf("%04X\n", *reg_pc(gb));
 		do_interrupts(gb);
 		run_instruction(gb);
 	}

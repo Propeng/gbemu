@@ -237,7 +237,7 @@ void draw_bg(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		} else if (gb->cgb_mode == 2) {
 			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0)) {
 				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
-				line[x] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
+				line[x] = cgb_palette_color(gb, gb->cgb_bg_palette, palette_index);
 			}
 		} else {
 			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0))
@@ -282,7 +282,7 @@ void draw_window(GBContext *gb, uint32_t *line, int scanline, int layer) {
 		} else if (gb->cgb_mode == 2) {
 			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0)) {
 				palette_index = dmg_palette_index(gb, gb->io[IO_LCD_BGP], palette_index);
-				line[sx] = cgb_palette_color(gb, gb->cgb_bg_palette+((bgattr[tile_index] & MASK_BGATTR_PAL)*8), palette_index);
+				line[sx] = cgb_palette_color(gb, gb->cgb_bg_palette, palette_index);
 			}
 		} else {
 			if ((palette_index == 0 && layer == 0) || (palette_index > 0 && layer > 0))
@@ -350,9 +350,9 @@ void draw_sprites(GBContext *gb, uint32_t *line, int scanline, int layer) {
 							palette_index = dmg_palette_index(gb, palette, palette_index);
 							if (data[3] & MASK_SPATTR_PRIORITY) {
 								if (layer == 0)
-									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + (((data[3] & MASK_SPATTR_PAL) ? 1 : 0)*8), palette_index);
+									line[x] = cgb_palette_color(gb, gb->cgb_obj_palette, palette_index);
 							} else if (layer > 0) {
-								line[x] = cgb_palette_color(gb, gb->cgb_obj_palette + (((data[3] & MASK_SPATTR_PAL) ? 1 : 0)*8), palette_index);
+								line[x] = cgb_palette_color(gb, gb->cgb_obj_palette, palette_index);
 							}
 						} else {
 							if (data[3] & MASK_SPATTR_PRIORITY) {

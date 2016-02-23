@@ -44,7 +44,7 @@ bool AudioBuffer::onGetData(Chunk &data) {
 			printf("Too much latency, skipping...\n");
 			buf_ptr = 0;
 			while (buf_queue->length() > 0) {
-				buf_queue->dequeue();
+				free(buf_queue->dequeue());
 			}
 		}
 		free(buf);

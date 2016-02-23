@@ -56,10 +56,15 @@ uint32_t* run_frame(GBContext *gb) {
 	int last_cycles;
 	int clk = gb->cycles;
 	uint32_t *framebuf;
+	int reading_vblank = 0;
 
 	if (gb->settings.paused) {
 		framebuf = gb->last_framebuf;
 	} else {
+		if (gb->sgb.vblank_read) {
+			reading_vblank = 1;
+		}
+
 		video_mode(gb, 1);
 		if (gb->io[IO_LCDC] & MASK_LCDC_ENABLE)
 			req_interrupt(gb, INT_VBLANK);
@@ -89,7 +94,7 @@ uint32_t* run_frame(GBContext *gb) {
 		cpu_cycle(gb);
 		gb->extra_cycles += gb->cycles-last_cycles;
 
-		if (gb->sgb.vblank_read) {
+		if (reading_vblank) {
 			gb->sgb.vblank_read = 0;
 			gb->sgb.vblank_callback(gb);
 		}
